@@ -21,13 +21,21 @@ class RolePlayAgent:
             self.model = model
         # chat
         self.chat_man = ChatManager()
-        self.chat_man.system_message(self.role_system)
+        self.chat_man.system = self.role_system
+
+    @property
+    def system_prompt(self):
+        return self.role_system
+
+    @system_prompt.setter
+    def system_prompt(self, message):
+        self.role_system = message
+        self.chat_man.system = self.role_system
 
     def load_role_info(self):
-        self.role_system = Template(self.role_info["role_system"])
+        self.role_system_template = Template(self.role_info["role_system"])
         self.role = self.role_info["role"]
-        self.name = self.role["name"]
-        self.role_system = self.role_system.substitute(self.role)
+        self.role_system = self.role_system_template.substitute(self.role)
 
     def chat(self, input_messages):
         # 处理消息
@@ -43,6 +51,7 @@ class RolePlayAgent:
         return r
 
     def chat_stream(self, input_messages):
+        reasoning_cache_message = []
         cache_message = []
         self.chat_man.add_user_message(input_messages)
 
@@ -52,11 +61,20 @@ class RolePlayAgent:
         if response.stream:
             for event in response.stream:
                 if "contentBlockDelta" in event:
-                    delta = event["contentBlockDelta"]
-                    if "delta" in delta and "text" in delta["delta"]:
-                        t = delta["delta"]["text"]
-                        cache_message.append(t)
-                        yield f"{json.dumps({"data":t})}"
+                    delta = event["contentBlockDelta"]["delta"]
+                    if "text" in delta:
+                        text = delta["text"]
+                        cache_message.append(text)
+                        yield f"{json.dumps({"data":text})}"
+                    if "reasoningContent" in delta:
+                        reason = delta["reasoningContent"]
+                        if "text" in reason:
+                            reason_text = reason["text"]
+                            reasoning_cache_message.append(reason_text)
+                            yield f"{json.dumps({"reasoning_data":reason_text})}"
+                        if "signature" in reason:
+                            signature = reason["signature"]
+                            yield f"{json.dumps({"event":f"signature:{signature}"})}"
                 if "messageStart" in event:
                     message_start = event["messageStart"]
                     role = message_start["role"]
@@ -80,6 +98,8 @@ class RolePlayAgent:
         #                     cache_message.append(t)
         #                 yield f"{t}"
         # yield parse_model_stream_response(res, cache_message=cache_message)
+
+        # 处理 reasoning TODO
         self.chat_man.add_assistant_response("".join(cache_message))
 
     def observe(self, env_status):

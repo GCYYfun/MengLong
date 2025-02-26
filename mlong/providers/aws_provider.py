@@ -45,15 +45,23 @@ class AwsProvider(Provider):
             "stopSequences",
         ]
 
-    def normalize_response(self, response):
+    def normalize_chat_response(self, response, thinking_mode):
         """Normalize the response from the Bedrock API to match OpenAI's response format."""
         norm_response = ChatResponse()
-        norm_response.choices[0].message.content = response["output"]["message"][
-            "content"
-        ][0]["text"]
+        if thinking_mode:
+            norm_response.choices[0].message.reasoning_content = response["output"][
+                "message"
+            ]["content"][0]["reasoningContent"]["reasoningText"]["text"]
+            norm_response.choices[0].message.content = response["output"]["message"][
+                "content"
+            ][1]["text"]
+        else:
+            norm_response.choices[0].message.content = response["output"]["message"][
+                "content"
+            ][0]["text"]
         return norm_response
 
-    def normalize_stream_response(self, response):
+    def normalize_stream_response(self, response, thinking_mode):
         """Normalize the response from the Bedrock API to match OpenAI's response format."""
         norm_response = ChatStreamResponse()
         # norm_response.id = response["id"]
@@ -89,6 +97,16 @@ class AwsProvider(Provider):
         # ][0]["text"]
         return norm_response
 
+    def model_call(self, call_param, stream_mode, thinking_mode):
+        if stream_mode:
+            # Call the Bedrock Converse API with the stream parameter.
+            response = self.client.converse_stream(**call_param)
+            return self.normalize_stream_response(response, thinking_mode)
+        else:
+            # Call the Bedrock Converse API.
+            response = self.client.converse(**call_param)
+            return self.normalize_chat_response(response, thinking_mode)
+
     def chat(self, model, messages, **kwargs):
         # Any exception raised by Anthropic will be returned to the caller.
         # Maybe we should catch them and raise a custom LLMError.
@@ -111,23 +129,22 @@ class AwsProvider(Provider):
                 inference_config[key] = value
             else:
                 additional_model_request_fields[key] = value
-        if kwargs.get("stream") is True:
-            # Call the Bedrock Converse API with the stream parameter.
-            response = self.client.converse_stream(
-                modelId=model,  # baseModelId or provisionedModelArn
-                messages=prompot_mesages,
-                system=system_message,
-                inferenceConfig=inference_config,
-                additionalModelRequestFields=additional_model_request_fields,
-            )
-            return self.normalize_stream_response(response)
-        else:
-            # Call the Bedrock Converse API.
-            response = self.client.converse(
-                modelId=model,  # baseModelId or provisionedModelArn
-                messages=prompot_mesages,
-                system=system_message,
-                inferenceConfig=inference_config,
-                additionalModelRequestFields=additional_model_request_fields,
-            )
-            return self.normalize_response(response)
+
+        # check spicial mode like stream 、 thinking
+        stream_mode = kwargs.get("stream", False)
+        thinking_mode = (
+            True
+            if kwargs.get("thinking", {}).get("type", "disabled") == "enabled"
+            else False
+        )
+
+        # model call
+        # call param
+        call_param = {
+            "modelId": model,  # baseModelId or provisionedModelArn
+            "messages": prompot_mesages,
+            "system": system_message,
+            "inferenceConfig": inference_config,
+            "additionalModelRequestFields": additional_model_request_fields,
+        }
+        return self.model_call(call_param, stream_mode, thinking_mode)

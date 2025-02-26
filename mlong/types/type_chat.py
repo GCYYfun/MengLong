@@ -5,6 +5,9 @@ class ChatResponse:
     def __init__(self):
         self.choices = [Choice()]
 
+    # def text():
+    #     return self.choices[0].message.content
+
 
 class ChatStreamResponse:
     def __init__(self):
@@ -19,6 +22,7 @@ class Choice:
 
 class Message:
     def __init__(self):
+        self.reasoning_content = None
         self.content = None
 
 
@@ -45,7 +49,8 @@ class ChatManager:
     def messages(self):
         return self.context
 
-    def system_message(self, message):
+    @system.setter
+    def system(self, message):
         if len(self.context) != 0:
             if self.context[0]["role"] == "system":
                 self.context[0]["content"] = message

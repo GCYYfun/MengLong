@@ -7,6 +7,10 @@ MODEL_LIST = {
         "aws",
         "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
     ),
+    "us.anthropic.claude-3-7-sonnet-20250219-v1:0": (
+        "aws",
+        "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+    ),
 }
 
 # 示例用法

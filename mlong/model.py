@@ -10,6 +10,7 @@ from mlong.types.type_model import MODEL_LIST
 
 
 class Model:
+
     def __init__(self, model_id: str = None, model_configs: dict = None):
         """
         模型的一个抽象, 通过 model 可以调用不同的模型, 但是 model 本身并不关心模型的实现细节, 只关心模型的调用方式.
@@ -17,8 +18,9 @@ class Model:
         model_configs: 模型的配置信息 (TODO: 需要进一步明确 格式，作用范围)
         """
         # self.default_model = "aws.us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+        # anthropic.claude-3-7-sonnet-20250219-v1:0
         if model_id is None:
-            self.model_id = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+            self.model_id = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
         else:
             if model_id not in MODEL_LIST:
                 raise ValueError(f"Model {model_id} is not supported")
