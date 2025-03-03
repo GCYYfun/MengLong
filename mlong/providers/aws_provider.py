@@ -34,10 +34,7 @@ class AwsProvider(Provider):
             **config: Configuration options for the provider.
 
         """
-        self.region_name = config.get(
-            "region_name", os.getenv("AWS_REGION", "us-west-2")
-        )
-        self.client = boto3.client("bedrock-runtime", region_name=self.region_name)
+        self.client = boto3.client("bedrock-runtime", region_name=config.get("region"),aws_access_key_id=config.get("access_key"),aws_secret_access_key=config.get("secret_key"))
         self.inference_parameters = [
             "maxTokens",
             "temperature",

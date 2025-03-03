@@ -5,8 +5,8 @@ import unittest
 # 设置项目根目录, 使得可以直接import mlong
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from mlong.model import Model
-from mlong.utils import user, assistant, system
+from mlong.model_interface import Model
+from mlong.model_interface.utils import user, assistant, system
 
 
 class ClientTests(unittest.TestCase):
