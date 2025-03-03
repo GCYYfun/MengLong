@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Optional
-from mlong.utils import user, assistant, system
+from mlong.model_interface.utils import user, assistant, system
 
 class ContextManager:
     """上下文管理器，负责管理对话上下文"""

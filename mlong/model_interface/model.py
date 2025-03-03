@@ -21,7 +21,6 @@ class Model:
         
         # 加载配置文件
         provider_config = load_config()
-        print(f"Provider config: {provider_config}")
         
         # 检查配置文件中是否含有default键
         if "default" in provider_config:
