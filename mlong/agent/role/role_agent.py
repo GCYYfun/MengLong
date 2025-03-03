@@ -1,27 +1,26 @@
 import json
 from string import Template
 
-from mlong.utils.util import parse_model_stream_response, parse_text_stream_response
-from mlong.model import Model
-from mlong.types.type_chat import ChatManager
-from mlong.utils import stream_to_str
+from mlong.model_interface import Model
+from mlong.component import ContextManager
+from mlong.agent.agent import Agent
 
 
-class RolePlayAgent:
-    def __init__(self, model: Model = None, role_info: dict = None):
+class RoleAgent(Agent):
+    def __init__(
+        self,
+        role_config: dict = None,
+        model_id: str = None,
+    ):
+        super().__init__(model_id=model_id)
         self.id = 0
-        self.role_info = role_info
+        self.role_config = role_config
         # prompt
-        self.load_role_info()
+        self.load_role_config()
 
-        # model
-        if model is None:
-            self.model = Model()
-        else:
-            self.model = model
         # chat
-        self.chat_man = ChatManager()
-        self.chat_man.system = self.role_system
+        self.context_manager = ContextManager()
+        self.context_manager.system = self.role_system
 
     @property
     def system_prompt(self):
@@ -30,32 +29,39 @@ class RolePlayAgent:
     @system_prompt.setter
     def system_prompt(self, message):
         self.role_system = message
-        self.chat_man.system = self.role_system
+        self.context_manager.system = self.role_system
 
-    def load_role_info(self):
-        self.role_system_template = Template(self.role_info["role_system"])
-        self.role = self.role_info["role"]
-        self.role_system = self.role_system_template.substitute(self.role)
+    def load_role_config(self):
+        self.role_system_template = Template(self.role_config["role_system"])
+        self.role_var = self.role_config["role_var"]
+        self.role_info = self.role_config["role_info"]
+        self.role_var.update(self.role_info)
+        self.role_system = self.role_system_template.substitute(self.role_var)
+
+    def update_system_message(self, message):
+        self.role_var.update(message)
+        self.role_system = self.role_system_template.substitute(self.role_var)
+        self.context_manager.system = self.role_system
 
     def chat(self, input_messages):
         # 处理消息
-        self.chat_man.add_user_message(input_messages)
+        self.context_manager.add_user_message(input_messages)
 
-        messages = self.chat_man.messages
+        messages = self.context_manager.messages
 
         res = self.model.chat(messages=messages)
 
         r = res.choices[0].message.content
-        self.chat_man.add_assistant_response(r)
+        self.context_manager.add_assistant_response(r)
 
         return r
 
     def chat_stream(self, input_messages):
         reasoning_cache_message = []
         cache_message = []
-        self.chat_man.add_user_message(input_messages)
+        self.context_manager.add_user_message(input_messages)
 
-        messages = self.chat_man.messages
+        messages = self.context_manager.messages
 
         response = self.model.chat(messages=messages, stream=True)
         if response.stream:
@@ -65,24 +71,24 @@ class RolePlayAgent:
                     if "text" in delta:
                         text = delta["text"]
                         cache_message.append(text)
-                        yield f"{json.dumps({"data":text})}"
+                        yield f"{json.dumps({'data': text})}"
                     if "reasoningContent" in delta:
                         reason = delta["reasoningContent"]
                         if "text" in reason:
                             reason_text = reason["text"]
                             reasoning_cache_message.append(reason_text)
-                            yield f"{json.dumps({"reasoning_data":reason_text})}"
+                            yield f"{json.dumps({'reasoning_data': reason_text})}"
                         if "signature" in reason:
                             signature = reason["signature"]
-                            yield f"{json.dumps({"event":f"signature:{signature}"})}"
+                            yield f"{json.dumps({'event': f'signature:{signature}'})}"
                 if "messageStart" in event:
                     message_start = event["messageStart"]
                     role = message_start["role"]
-                    yield f"{json.dumps({"event":f"start:{role}"})}"
+                    yield f"{json.dumps({'event': f'start:{role}'})}"
                 if "messageStop" in event:
                     message_stop = event["messageStop"]
                     reason = message_stop["stopReason"]
-                    yield f"{json.dumps({"event":f"stop:{reason}"})}"
+                    yield f"{json.dumps({'event': f'stop:{reason}'})}"
         # res = self.model.chat(messages=messages, stream=True)
 
         # s = res.stream
@@ -100,7 +106,7 @@ class RolePlayAgent:
         # yield parse_model_stream_response(res, cache_message=cache_message)
 
         # 处理 reasoning TODO
-        self.chat_man.add_assistant_response("".join(cache_message))
+        self.context_manager.add_assistant_response("".join(cache_message))
 
     def observe(self, env_status):
         obs = f"""你能够对输入的信息进行全面、细致的观察，包括但不限于文本、数据、图像或环境信息。你能够识别关键细节、模式和关系，并提取有价值的信息。

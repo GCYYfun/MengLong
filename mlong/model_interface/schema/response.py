@@ -29,8 +29,8 @@ class StreamChoice(BaseModel):
     index: int = Field(default=0, description="选择项索引")
     finish_reason: Optional[str] = Field(default=None, description="结束原因")
 
-class ChatStreamResponse(BaseModel):
+class ChatStreamResponse():
     """流式聊天响应模型"""
-    choices: List[StreamChoice] = Field(description="流式响应选项列表")
-    model: Optional[str] = Field(default=None, description="使用的模型标识符")
-    usage: Optional[Dict[str, int]] = Field(default=None, description="token使用统计")
+    def __init__(self):
+        self.stream = None
+    

@@ -70,9 +70,11 @@ class AwsProvider(Provider):
         """
         # 这里需要根据实际的流式响应格式进行处理
         # 以下是一个基本实现，可能需要根据实际情况调整
-        stream_delta = StreamDelta(content=response.get("stream", ""))
-        stream_choice = StreamChoice(delta=stream_delta)
-        return ChatStreamResponse(choices=[stream_choice])
+        norm_response = ChatStreamResponse()
+        stream = response.get("stream", "")
+        norm_response.stream = stream
+
+        return norm_response
 
     def model_call(self, call_param: dict, stream_mode: bool, thinking_mode: bool) -> Union[ChatResponse, ChatStreamResponse]:
         """调用Bedrock API

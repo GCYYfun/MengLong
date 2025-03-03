@@ -78,3 +78,65 @@ class ContextManager:
     def pop(self) -> Dict[str, Any]:
         """移除并返回最后一条消息"""
         return self.context.pop()
+
+
+class ATAContextManager:
+    """Agent to Agent 上下文管理器"""
+    def __init__(self):
+        """初始化上下文管理器"""
+        self.context_manager = {
+            "active": ContextManager(),
+            "passive": ContextManager(),
+            "topic": ContextManager(),
+        }
+    
+    def reset(self):
+        """重置上下文管理器"""
+        for key in self.context_manager:
+            self.context_manager[key].reset()
+    def clear(self):
+        """清除上下文管理器"""
+        for key in self.context_manager:
+            self.context_manager[key].clear()
+    def get_context(self, key: str) -> List[Dict[str, Any]]:
+        """获取指定角色的上下文
+        Args:
+            key: 角色名称
+        Returns:
+            上下文列表
+        """
+        return self.context_manager[key].messages
+    def get_system(self, key: str) -> Optional[str]:
+        """获取指定角色的系统消息
+        Args:
+            key: 角色名称
+        Returns:
+            系统消息内容
+        """ 
+        return self.context_manager[key].system
+
+    @property
+    def active(self) -> ContextManager:
+        """获取主动角色的上下文管理器"""
+        return self.context_manager["active"]
+    @property
+    def passive(self) -> ContextManager:
+        """获取被动角色的上下文管理器"""
+        return self.context_manager["passive"]
+    @property
+    def topic(self) -> ContextManager:
+        """获取话题的上下文管理器"""
+        return self.context_manager["topic"]
+
+    @active.setter
+    def active(self, context: ContextManager):
+        """设置主动角色的系统消息"""
+        self.context_manager["active"] = context
+    @passive.setter
+    def passive(self, context: ContextManager):
+        """设置被动角色的系统消息"""
+        self.context_manager["passive"] = context
+    @topic.setter
+    def topic(self, context: ContextManager):
+        """设置话题的系统消息"""
+        self.context_manager["topic"] = context
