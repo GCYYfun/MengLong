@@ -176,4 +176,5 @@ cython_debug/
 .DS_Store
 .configs
 
+**/.pkl
 **/DESIGN.md

@@ -34,3 +34,8 @@ class ChatStreamResponse():
     def __init__(self):
         self.stream = None
     
+class EmbedResponse(BaseModel):
+    """嵌入响应模型"""
+    embeddings: List[List[float]] = Field(description="嵌入向量列表")
+    texts: Optional[List[str]] = Field(default=None, description="文本数据列表")
+    model: Optional[str] = Field(default=None, description="使用的模型标识符")

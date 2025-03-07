@@ -1,7 +1,6 @@
 import json
 from string import Template
 
-from mlong.model_interface import Model
 from mlong.component import ContextManager
 from mlong.agent.agent import Agent
 
@@ -89,23 +88,7 @@ class RoleAgent(Agent):
                     message_stop = event["messageStop"]
                     reason = message_stop["stopReason"]
                     yield f"{json.dumps({'event': f'stop:{reason}'})}"
-        # res = self.model.chat(messages=messages, stream=True)
 
-        # s = res.stream
-        # if s:
-        #     for event in s:
-        #         # 将事件转换为字典
-        #         # event = await event.json()
-        #         if "contentBlockDelta" in event:
-        #             delta = event["contentBlockDelta"]
-        #             if "delta" in delta and "text" in delta["delta"]:
-        #                 t = delta["delta"]["text"]
-        #                 if cache_message is not None:
-        #                     cache_message.append(t)
-        #                 yield f"{t}"
-        # yield parse_model_stream_response(res, cache_message=cache_message)
-
-        # 处理 reasoning TODO
         self.context_manager.add_assistant_response("".join(cache_message))
 
     def observe(self, env_status):
@@ -194,17 +177,9 @@ class RoleAgent(Agent):
     # 检查 - reflect
     # 执行 - execute
     def step(self, obs):
-        # print("env_status:", obs)
         observation = self.observe(obs)
-        # print("observation:", observation)
-        # retrieved = self.retrieve(observation)
-        # print("retrieved:", retrieved)
         plan = self.thinking(obs, retrieved="")
         print("plan:", plan)
-        # decision = self.reflect(plan)
-        # print("decision:", decision)
-        # result = self.execute(decision)
-        # print("result:", result)
         return self.id, plan
 
     def step_stream(self, obs):
@@ -214,23 +189,18 @@ class RoleAgent(Agent):
             i = json.loads(item)
             if "data" in i:
                 cache_message.append(i["data"])
-            # cache_message.append(item)
             yield f"{item}"
-            # await asyncio.sleep(0)
-        # await asyncio.sleep(0)
+
         obs = "".join(cache_message)
         print("observation:", obs)
         cache_message.clear()
-        # print("observation:", observation)
-        # retrieved = self.retrieve(observation)
-        # print("retrieved:", retrieved)
+
         for item in self.thinking_stream(obs, retrieved=""):
             i = json.loads(item)
             if "data" in i:
                 cache_message.append(i["data"])
             yield f"{item}"
-        # await asyncio.sleep(0)
-        # await asyncio.sleep(0)
+
         plan = "".join(cache_message)
         cache_message.clear()
         print("plan:", plan)

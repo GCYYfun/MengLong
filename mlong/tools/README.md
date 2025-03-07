@@ -73,16 +73,30 @@ response = agent.chat("计算斐波那契数列的前10个数")
 from mlong.tools.vector_database import VectorDatabase
 
 # 初始化向量数据库
-vector_db = VectorDatabase(embedding_model="text-embedding-ada-002")
+# 创建集合
+vector_db = VectorStore.create_collection("ai_docs")
 
-# 添加文档
-vector_db.add_document("doc1", "人工智能基础概念与应用")
-vector_db.add_document("doc2", "深度学习在自然语言处理中的应用")
+# 添加文档（带元数据）
+vector_db.add_documents(
+    documents=[
+        "人工智能基础概念与应用",
+        "深度学习在自然语言处理中的应用"
+    ],
+    metadatas=[
+        {"category": "基础理论"},
+        {"category": "应用实践"}
+    ]
+)
 
-# 查询相似文档
-results = vector_db.query("机器学习应用", top_k=3)
-for doc_id, score in results:
-    print(f"文档: {doc_id}, 相似度: {score}")
+# 带过滤条件的查询
+results = vector_db.query_documents(
+    "机器学习应用",
+    top_k=3,
+    filter_conditions={"category": "应用实践"}
+)
+for result in results:
+    print(f"文档ID: {result['id']}, 相似度: {result['score']:.2f}")
+    print(f"元数据: {result['metadata']}")
 ```
 
 ## 添加新工具

@@ -1,8 +1,9 @@
 import boto3
+import json
 from typing import Union
 from ..provider import Provider
 from ..utils.message_formatter import format_messages_for_aws
-from ..schema.response import ChatResponse, ChatStreamResponse, Choice, MessageContent, StreamChoice, StreamDelta
+from ..schema.response import ChatResponse, ChatStreamResponse, Choice, MessageContent, EmbedResponse
 
 
 class AwsProvider(Provider):
@@ -94,7 +95,7 @@ class AwsProvider(Provider):
             response = self.client.converse(**call_param)
             return self.normalize_chat_response(response, thinking_mode)
 
-    def chat(self, model: str, messages: list, **kwargs) -> Union[ChatResponse, ChatStreamResponse]:
+    def chat(self, model_id: str, messages: list, **kwargs) -> Union[ChatResponse, ChatStreamResponse]:
         """执行聊天完成
         
         Args:
@@ -122,7 +123,7 @@ class AwsProvider(Provider):
         thinking_mode = kwargs.get("thinking", {}).get("type", "disabled") == "enabled"
 
         call_param = {
-            "modelId": model,
+            "modelId": model_id,
             "messages": prompt_messages,
             "system": system_message,
             "inferenceConfig": inference_config,
@@ -130,3 +131,30 @@ class AwsProvider(Provider):
         }
         
         return self.model_call(call_param, stream_mode, thinking_mode)
+
+    def embed(self, model_id: str, texts: [], **kwargs) -> EmbedResponse:
+        """执行嵌入向量计算
+
+        Args:
+            model: 模型标识符
+            text: 文本
+            **kwargs: 其他参数
+
+        Returns:
+            嵌入向量响应
+        """
+        # print("Model ID: {}".format(model_id))
+        # print("Embedding text: {}".format(texts))
+        request = {
+            "texts": texts,
+            "input_type": "search_document",
+        }
+        request = json.dumps(request)
+        # Invoke the model with the request.
+        response = self.client.invoke_model(modelId=model_id, body=request)
+
+        # Decode the model's native response body.
+        model_response = json.loads(response["body"].read())
+        embeddings = model_response["embeddings"]
+
+        return EmbedResponse(embeddings=embeddings,metadata=texts,model=model_id)

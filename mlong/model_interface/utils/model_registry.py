@@ -12,4 +12,8 @@ MODEL_REGISTRY: Dict[str, Tuple[str, str]] = {
         "aws",
         "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
     ),
+    "cohere.embed-multilingual-v3": (
+        "aws",
+        "cohere.embed-multilingual-v3",
+    ),
 }

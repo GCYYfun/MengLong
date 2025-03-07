@@ -1,19 +1,18 @@
 import json
 from mlong.memory.short_term_memory import ShortTermMemory
 from mlong.memory.working_memory import WorkingMemory
-from mlong.model import Model
-from mlong.agent.role_play.role_play_agent import RolePlayAgent
+from mlong.agent.role_play.role_agent import RoleAgent
 
 
-class YaoGuang(RolePlayAgent):
+class YaoGuang(RoleAgent):
     def __init__(
         self,
-        model: Model = None,
+        model_id: str = None,
         role_info: dict = None,
         st_memory_file=None,
         wm_memory_file=None,
     ):
-        super(YaoGuang, self).__init__(model, role_info)
+        super(YaoGuang, self).__init__(role_info,model_id)
 
         if st_memory_file is None:
             st_memory_file = "memory/memcache/short_term_memory.json"
