@@ -107,7 +107,7 @@ class Model:
             )
         return self.provider_client[provider]
 
-    def chat(self, model_id: str = None, messages: List[Dict[str, Any]] = [], **kwargs):
+    def chat(self, messages: List[Dict[str, Any]] = [], model_id: str = None, **kwargs):
         """发送聊天请求
 
         Args:
@@ -134,7 +134,7 @@ class Model:
             raise ValueError(f"Provider {provider} is not supported")
 
         try:
-            return model_client.chat(messages=messages, model=model, **kwargs)
+            return model_client.chat(messages=messages, model_id=model_id, **kwargs)
         except Exception as e:
             # 统一错误处理
             raise RuntimeError(f"Chat request failed: {str(e)}")
@@ -153,7 +153,7 @@ class Model:
         """
         if model_id is None:
             model_id = self.embed_model_id
-            
+
         if model_id not in MODEL_REGISTRY:
             raise ValueError(f"Model {model_id} is not supported")
 

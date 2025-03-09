@@ -12,8 +12,8 @@ class RoleAgent(Agent):
         model_id: str = None,
     ):
         super().__init__(model_id=model_id)
-        self.id = 0
         self.role_config = role_config
+        self.id = role_config["id"]
         # prompt
         self.load_role_config()
 
@@ -62,7 +62,7 @@ class RoleAgent(Agent):
 
         messages = self.context_manager.messages
 
-        response = self.model.chat(messages=messages, stream=True)
+        response = self.model.chat(messages=messages,stream=True)
         if response.stream:
             for event in response.stream:
                 if "contentBlockDelta" in event:
@@ -83,7 +83,7 @@ class RoleAgent(Agent):
                 if "messageStart" in event:
                     message_start = event["messageStart"]
                     role = message_start["role"]
-                    yield f"{json.dumps({'event': f'start:{role}'})}"
+                    yield f"{json.dumps({'event': f'start:{role}-{self.id}'})}"
                 if "messageStop" in event:
                     message_stop = event["messageStop"]
                     reason = message_stop["stopReason"]

@@ -52,7 +52,7 @@ class AgentToAgentChat:
         passive_res = ""
         while True:  # TODO Interrupted
             index += 1
-            print(f"对话次数: {index}")
+            # print(f"对话次数: {index}")
             if len(self.context_manager.topic.messages) == 0 or len(self.context_manager.topic.messages) == 1:
                 active_res = self.active.chat(self.active_topic)
                 # print(f"[system]\n\n{self.active.context_manager.system}")
@@ -95,7 +95,8 @@ class AgentToAgentChat:
         passive_res = ""
         while pending:  # TODO Interrupted
             index += 1
-            print(f"对话次数: {index}")
+            # print(f"对话次数: {index}")
+            # print("ACTIVE:")
             if len(self.context_manager.topic.messages) == 0 or len(self.context_manager.topic.messages) == 1:
                 active_res = self.active.chat_stream(self.active_topic)
                 for item in active_res:
@@ -103,6 +104,7 @@ class AgentToAgentChat:
                     if "data" in i:
                         i = i["data"]
                         cache_message.append(i)
+                    # print(item)
                     yield item
             else:
                 active_res = self.active.chat_stream(passive_res)
@@ -111,27 +113,32 @@ class AgentToAgentChat:
                     if "data" in i:
                         i = i["data"]
                         cache_message.append(i)
+                    # print(item)
                     yield item
             active_res = "".join(cache_message)
             self.context_manager.topic.add_user_message(active_res)
             # 检测回复包含结束标志
             if self.is_over(a_res=active_res):
+                # print("Active End")
                 pending = False
                 cache_message.clear()
                 break
             # reset
             cache_message.clear()
+            # print("PASSIVE:")
             passive_res = self.passive.chat_stream(active_res)
             for item in passive_res:
                 i = json.loads(item)
                 if "data" in i:
                     i = i["data"]
                     cache_message.append(i)
+                # print(item)
                 yield item
             passive_res = "".join(cache_message)
             self.context_manager.topic.add_assistant_response(passive_res)
 
             if self.is_over(p_res=passive_res):
+                # print("Passive End")
                 pending = False
 
     def replace_role_name(self, messages, user, assistant):
