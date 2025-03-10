@@ -36,12 +36,13 @@ topic_template = """
 - 对话内容：描述本次对话的内容。
 
 example:
-#### 对话元信息
+
+```对话元信息
 - <心情>:(愉悦、悲伤，愤怒，恐惧，惊讶，平静)
 - <态度>:(友好、热情、冷淡、中性、恶劣)
 - <心里活动>
 - <指示符号>
-#### 对话内容
+```
 <内容>
 
 正常对话指示符号为[NONE]
@@ -88,14 +89,39 @@ st.markdown("""
     position: relative;
 }
 
-.ai1-bubble {
-    background: #e3f2fd;
-    margin-left: 70px;
+.user-bubble {
+    background: #ffffff;
+    margin-right: auto;
+    margin-left: 15px;
+    border-radius: 15px 15px 15px 0;
 }
 
-.ai2-bubble {
-    background: #fce4ec;
-    margin-right: 70px;
+.assistant-bubble {
+    background: #d9fdd3;
+    margin-left: auto;
+    margin-right: 15px;
+    border-radius: 15px 15px 0 15px;
+}
+
+.chat-bubble::after {
+    content: attr(data-time);
+    font-size: 0.75rem;
+    color: #666;
+    position: absolute;
+    bottom: -20px;
+    width: 100%;
+}
+
+.user-bubble::after {
+    left: 0;
+    text-align: left;
+}
+
+.assistant-bubble::after {
+    right: 0;
+    text-align: right;
+}
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -111,7 +137,7 @@ if 'ata' not in st.session_state:
     )
 
 # 创建两栏布局
-col1, col2 = st.columns([1, 1], gap="large")
+# 删除双栏布局代码
 
 # 对话控制按钮
 if st.button('🚀 开始对话', use_container_width=True, key='start_chat'):
@@ -131,7 +157,7 @@ if st.button('🚀 开始对话', use_container_width=True, key='start_chat'):
         for chunk in st.session_state.ata.chat_stream():
             try:
                 data = json.loads(chunk)
-                
+                # print(data)
                 # [Event Handling 事件处理]
                 # 识别事件类型并设置当前说话者
                 # Identifies event type and sets current speaker
@@ -140,8 +166,8 @@ if st.button('🚀 开始对话', use_container_width=True, key='start_chat'):
                     if event_type == "start":
                         current_speaker = "Alice" if "Alice" in data["event"] else "Bob"
                         st.session_state.conversation.append({"role": current_speaker, "content": ""})
-                    elif event_type == "stop":
-                        break
+                    # elif event_type == "stop":
+                    #     break
                 
                 # [Content Processing 内容处理]
                 # 将数据块追加到当前说话者的对话记录
@@ -152,9 +178,10 @@ if st.button('🚀 开始对话', use_container_width=True, key='start_chat'):
                         
                         # 实时更新界面
                         with placeholder.container():
-                            # for msg in st.session_state.conversation:
-                            with chat_message(name=st.session_state.conversation[-1]["role"], avatar="user" if st.session_state.conversation[-1]["role"] == "Alice" else "assistant"):
-                                st.markdown(st.session_state.conversation[-1]["content"])
+                                for msg in st.session_state.conversation:
+                                    with chat_message(name=msg["role"], avatar="user" if msg["role"] == "Alice" else "assistant"):
+                                        st.markdown(msg["content"])
+                                        st.caption(f"{time.strftime('%H:%M', time.localtime())}")
             
             except json.JSONDecodeError:
                 pass
