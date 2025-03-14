@@ -177,4 +177,5 @@ cython_debug/
 .configs
 
 **/.pkl
+**/*.yaml
 **/DESIGN.md

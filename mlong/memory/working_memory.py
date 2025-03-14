@@ -28,7 +28,7 @@ class WorkingMemory:
         }
         return self.episodic_buffer(processed)
 
-    def epidodic_buffer(self, data):
+    def episodic_buffer(self, data):
         if self.long_term_memory:
             data["related_memory"] = self.retrieve_long_term_memory(data)
         return self._format_output(data)

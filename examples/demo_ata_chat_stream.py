@@ -67,10 +67,6 @@ for chunk in ata.chat_stream():
             if event_type == "start":
                 current_speaker = "Alice" if "Alice" in data["event"] else "Bob"
                 print(f"\n\n{current_speaker}: ", end="", flush=True)
-            # elif event_type == "stop":
-            #     if "[END]" in current_message:
-            #         break
-        
         # 处理对话内容
         if "data" in data:
             content = data["data"]

@@ -8,24 +8,20 @@ class FluctLight(RoleAgent):
     def __init__(
         self,
         role_config: dict = None,
-        st_memory_file=None,
-        wm_memory_file=None,
+        memory_space: str = None,
         model_id: str = None,
     ):
-        super(FluctLight, self).__init__(role_config,model_id)
+        super(FluctLight, self).__init__(role_config, model_id)
 
-        if st_memory_file is None:
-            st_memory_file = "memory/memcache/short_term_memory.json"
-        if wm_memory_file is None:
-            wm_memory_file = "memory/memcache/working_memory.json"
+        if memory_space is None:
+            st_memory_file = "memory/memcache/short_term_memory.yaml"
+            wm_memory_file = "memory/memcache/working_memory.yaml"
+        else:
+            st_memory_file = f"{memory_space}/{self.id}_st_mem.yaml"
+            wm_memory_file = f"{memory_space}/{self.id}_wm_mem.yaml"
 
         self.st = ShortTermMemory(memory_file=st_memory_file)
-        self.wm = WorkingMemory(memory_file=st_memory_file)
-
-    def update_system_prompt(self, message):
-        self.role_var.update(message)
-        self.role_system = self.role_system_template.substitute(self.role_var)
-        self.context_manager.system = self.role_system
+        self.wm = WorkingMemory(memory_file=wm_memory_file)
 
     def chat_with_mem(self, input_messages):
         # some_thoughts = self.wm.central_executive(input_messages)

@@ -1,11 +1,11 @@
 import json
 from string import Template
 
-from mlong.agent.role import RoleAgent
+from mlong.agent.role import FluctLight
 from mlong.component.context_manager import ATAContextManager
 
 
-class AgentToAgentChat:
+class FLToFLChat:
     """Agent to Agent"""
 
     def __init__(
@@ -13,9 +13,10 @@ class AgentToAgentChat:
         topic=None,
         active_role: dict = None,
         passive_role: dict = None,
+        memory_space: str = None,
     ):
-        self.active = RoleAgent(active_role)
-        self.passive = RoleAgent(passive_role)
+        self.active = FluctLight(active_role, memory_space)
+        self.passive = FluctLight(passive_role,memory_space)
 
         self.topic = Template(topic)
         self.add_topic_to_context()
@@ -54,12 +55,12 @@ class AgentToAgentChat:
             index += 1
             # print(f"对话次数: {index}")
             if len(self.context_manager.topic.messages) == 0 or len(self.context_manager.topic.messages) == 1:
-                active_res = self.active.chat(self.active_topic)
+                active_res = self.active.chat_with_mem(self.active_topic)
                 # print(f"[system]\n\n{self.active.context_manager.system}")
                 print(f"{self.active.role_info["name"]}: \n{active_res}")
                 # print()
             else:
-                active_res = self.active.chat(passive_res)
+                active_res = self.active.chat_with_mem(passive_res)
                 # print(f"[system]\n\n{self.active.context_manager.system}")
                 print(f"{self.active.role_info["name"]}: \n{active_res}")
                 # print()
@@ -69,7 +70,7 @@ class AgentToAgentChat:
             if self.is_over(a_res=active_res):
                 break
 
-            passive_res = self.passive.chat(active_res)
+            passive_res = self.passive.chat_with_mem(active_res)
             # print(f"[system]\n\n{self.passive.context_manager.system}")
             print(f"{self.passive.role_info["name"]}:  \n{passive_res}")
             # print()
@@ -81,7 +82,9 @@ class AgentToAgentChat:
         self.context_manager.active = self.active.context_manager
         self.context_manager.passive = self.passive.context_manager
         messages = self.replace_role_name(messages, self.active.role_info["name"], self.passive.role_info["name"])
-
+        # mem
+        self.active.summary()
+        self.passive.summary()
         return messages
 
     def chat_stream(self, topic=None):
@@ -98,7 +101,7 @@ class AgentToAgentChat:
             # print(f"对话次数: {index}")
             # print("ACTIVE:")
             if len(self.context_manager.topic.messages) == 0 or len(self.context_manager.topic.messages) == 1:
-                active_res = self.active.chat_stream(self.active_topic)
+                active_res = self.active.chat_stream_with_mem(self.active_topic)
                 for item in active_res:
                     i = json.loads(item)
                     if "data" in i:
@@ -107,7 +110,7 @@ class AgentToAgentChat:
                     # print(item)
                     yield item
             else:
-                active_res = self.active.chat_stream(passive_res)
+                active_res = self.active.chat_stream_with_mem(passive_res)
                 for item in active_res:
                     i = json.loads(item)
                     if "data" in i:
@@ -126,7 +129,7 @@ class AgentToAgentChat:
             # reset
             cache_message.clear()
             # print("PASSIVE:")
-            passive_res = self.passive.chat_stream(active_res)
+            passive_res = self.passive.chat_stream_with_mem(active_res)
             for item in passive_res:
                 i = json.loads(item)
                 if "data" in i:
@@ -140,7 +143,8 @@ class AgentToAgentChat:
             if self.is_over(p_res=passive_res):
                 # print("Passive End")
                 pending = False
-
+        self.active.summary()
+        self.passive.summary()
     def replace_role_name(self, messages, user, assistant):
         role_play_messages = messages
         for message in role_play_messages:

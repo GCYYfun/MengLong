@@ -1,5 +1,4 @@
-import datetime
-import json
+import yaml
 import os
 
 
@@ -25,7 +24,7 @@ class ShortTermMemory:
         if os.path.exists(memory_file):
             with open(memory_file, "r", encoding="utf-8") as f:
                 st = f.read()
-            st = json.loads(st)
+            st = yaml.safe_load(st)
             # self.current_time = datetime.datetime.strptime(
             #     st["当前时间"], "%B %d, %Y, %H:%M:%S"
             # )
@@ -64,7 +63,7 @@ class ShortTermMemory:
         st["今日日志"] = self._daily_logs
 
         with open(self.memory_file, "w", encoding="utf-8") as f:
-            f.write(json.dumps(st, ensure_ascii=False, indent=4))
+            f.write(yaml.dump(st, allow_unicode=True, default_flow_style=False, indent=4))
 
     def recall(self):
         pass
