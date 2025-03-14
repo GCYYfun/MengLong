@@ -1,0 +1,28 @@
+name: agent
+description: 根据输入信息，计划并执行最终方案
+type: loop
+workflow:
+  - task_id: observe
+    method: chat
+    description: 请观察并分析输入信息，给出观察结果。
+    prompt: |
+      {Task}
+      {InputFields} 
+      {OutputFields} 
+      {Requirements} 
+    variables:
+      Task: |
+        请观察并分析输入信息，给出朴素的观察结果。
+      InputFields: |
+        输入信息:
+          1,1,2,3,5,8,13,21,34,55,89,144,233
+      OutputFields: | 
+        输出格式:
+          ```思考过程
+            xxx
+          ```
+          Markdown格式输出
+      Requirements: |
+        要求:
+          请使用中文回答
+          在无更多详细的任务需求的情况下，给出朴素的分析结果。信息简洁，不需过多的分析。

@@ -14,6 +14,7 @@ class RoleAgent(Agent):
         super().__init__(model_id=model_id)
         self.role_config = role_config
         self.id = role_config["id"]
+        
         # prompt
         self.load_role_config()
 
@@ -36,11 +37,6 @@ class RoleAgent(Agent):
         self.role_info = self.role_config["role_info"]
         self.role_var.update(self.role_info)
         self.role_system = self.role_system_template.substitute(self.role_var)
-
-    def update_system_message(self, message):
-        self.role_var.update(message)
-        self.role_system = self.role_system_template.substitute(self.role_var)
-        self.context_manager.system = self.role_system
 
     def chat(self, input_messages):
         # 处理消息

@@ -189,4 +189,4 @@ if st.button('🚀 开始对话', use_container_width=True, key='start_chat'):
 # 显示完整对话历史
 with st.expander("📜 完整对话记录"):
     for msg in st.session_state.conversation:
-        st.markdown(f"**{msg['role']}**: {msg['content']}")
+        st.markdown(f"**{msg['role']}**: \n {msg['content']}")

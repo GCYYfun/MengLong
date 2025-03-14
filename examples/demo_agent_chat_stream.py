@@ -4,6 +4,7 @@ from mlong.agent.role import RoleAgent
 
 
 role_config = {
+    "id":"Alice",
     "role_system": "你是一个中国${gender}性，你的名字叫${name}。\n\n${topic}\n\n%{daily_logs}",
     "role_info": {
         "name": "Alice",
