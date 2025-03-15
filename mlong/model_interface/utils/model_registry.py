@@ -16,4 +16,8 @@ MODEL_REGISTRY: Dict[str, Tuple[str, str]] = {
         "aws",
         "cohere.embed-multilingual-v3",
     ),
+    "us.deepseek.r1-v1:0":(
+        "aws",
+        "us.deepseek.r1-v1:0",
+    )
 }

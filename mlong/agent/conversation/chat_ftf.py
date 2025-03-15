@@ -14,9 +14,10 @@ class FLToFLChat:
         active_role: dict = None,
         passive_role: dict = None,
         memory_space: str = None,
+        model_id: str = None,
     ):
-        self.active = FluctLight(active_role, memory_space)
-        self.passive = FluctLight(passive_role,memory_space)
+        self.active = FluctLight(active_role, memory_space,model_id=model_id)
+        self.passive = FluctLight(passive_role,memory_space,model_id=model_id)
 
         self.topic = Template(topic)
         self.add_topic_to_context()

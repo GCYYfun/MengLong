@@ -10,7 +10,7 @@ class AgentToAgentChat:
 
     def __init__(
         self,
-        topic=None,
+        topic: dict = None,
         active_role: dict = None,
         passive_role: dict = None,
     ):
@@ -26,7 +26,7 @@ class AgentToAgentChat:
         self.context_manager = ATAContextManager()
         self.context_manager.topic.system = self.active_topic
 
-    def add_topic_to_context(self): # TODO specific topic
+    def add_topic_to_context(self):  # TODO specific topic
         self.active_topic = self.topic.substitute(
             name=self.active.role_info["name"],
             peer_name=self.passive.role_info["name"],
@@ -38,9 +38,9 @@ class AgentToAgentChat:
             peer_info=self.active.role_info,
         )
 
-        self.passive.update_system_prompt({"topic":f"{self.passive_topic}"})
+        self.passive.update_system_prompt({"topic": f"{self.passive_topic}"})
 
-    def update_topic(self, topic): # TODO specific topic
+    def update_topic(self, topic):  # TODO specific topic
         pass
 
     def chat(self, topic=None):
@@ -53,15 +53,18 @@ class AgentToAgentChat:
         while True:  # TODO Interrupted
             index += 1
             # print(f"对话次数: {index}")
-            if len(self.context_manager.topic.messages) == 0 or len(self.context_manager.topic.messages) == 1:
+            if (
+                len(self.context_manager.topic.messages) == 0
+                or len(self.context_manager.topic.messages) == 1
+            ):
                 active_res = self.active.chat(self.active_topic)
                 # print(f"[system]\n\n{self.active.context_manager.system}")
-                print(f"{self.active.role_info["name"]}: \n{active_res}")
+                print(f"{self.active.role_info['name']}: \n{active_res}")
                 # print()
             else:
                 active_res = self.active.chat(passive_res)
                 # print(f"[system]\n\n{self.active.context_manager.system}")
-                print(f"{self.active.role_info["name"]}: \n{active_res}")
+                print(f"{self.active.role_info['name']}: \n{active_res}")
                 # print()
 
             self.context_manager.topic.add_user_message(active_res)
@@ -71,7 +74,7 @@ class AgentToAgentChat:
 
             passive_res = self.passive.chat(active_res)
             # print(f"[system]\n\n{self.passive.context_manager.system}")
-            print(f"{self.passive.role_info["name"]}:  \n{passive_res}")
+            print(f"{self.passive.role_info['name']}:  \n{passive_res}")
             # print()
             self.context_manager.topic.add_assistant_response(passive_res)
 
@@ -80,7 +83,9 @@ class AgentToAgentChat:
         messages = self.context_manager.topic.messages
         self.context_manager.active = self.active.context_manager
         self.context_manager.passive = self.passive.context_manager
-        messages = self.replace_role_name(messages, self.active.role_info["name"], self.passive.role_info["name"])
+        messages = self.replace_role_name(
+            messages, self.active.role_info["name"], self.passive.role_info["name"]
+        )
 
         return messages
 
@@ -97,7 +102,10 @@ class AgentToAgentChat:
             index += 1
             # print(f"对话次数: {index}")
             # print("ACTIVE:")
-            if len(self.context_manager.topic.messages) == 0 or len(self.context_manager.topic.messages) == 1:
+            if (
+                len(self.context_manager.topic.messages) == 0
+                or len(self.context_manager.topic.messages) == 1
+            ):
                 active_res = self.active.chat_stream(self.active_topic)
                 for item in active_res:
                     i = json.loads(item)
