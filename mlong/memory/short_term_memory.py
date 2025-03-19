@@ -171,3 +171,6 @@ class ShortTermMemory:
     @daily_logs.setter
     def daily_logs(self, value):
         self._daily_logs = value
+
+    def reset(self):
+        self._daily_logs = []

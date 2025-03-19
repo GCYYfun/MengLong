@@ -3,7 +3,7 @@ from typing import Any, Dict
 from pathlib import Path
 
 
-def load_config(config_path: str = ".configs") -> Dict[str, Any]:
+def load_config(config_path: str = ".configs.toml") -> Dict[str, Any]:
     """
     从指定路径加载配置文件，使用toml格式
 

@@ -48,13 +48,39 @@ class FluctLight(RoleAgent):
             备注: [str,]
         }
         """
+        p2 = """
+        [当前对话结束,以你的视角总结我们的对话,根据下面我提供的json格式输出,只关注对话内容，不要包含你个人的背景信息]
+        回复的json格式如下:
+        {
+            "id": "事件的唯一标识",
+            "情境": {
+              "时间": "具体时间描述",
+              "地点": "事件发生的地点",
+              "环境": "天气、光线、声音等环境描述"
+            },
+            "内容": {
+              "动作": "事件中的主要动作或行为",
+              "对话": 【"事件中的对话主要内容, 如果有多个人对话, 则需要记录每个人的对话主要内容总结",]
+              "参与者": ["参与者列表，可以是人物或物体"]
+            },
+            "情感": {
+              "情绪": "当时的情绪状态描述",
+              "心理": "当时的内心感受描述",
+              "生理": "当时的身体生理反应描述"
+            },
+            "因果关系": "事件的前因后果描述",
+            "自我关联": "自己在事件中的角色和关联描述",
+            "总结": "事件的总结描述"
+        }
+        """
         response = self.chat(input_messages=p)
         self.st.daily_logs.append(response)
         self.st.remember()
         return response
 
     def reset(self):
-        self.chat_man.clear()
+        self.reset_system_prompt()
+        self.context_manager.clear()
         self.st.reset()
 
     def check_json_format(self, response):

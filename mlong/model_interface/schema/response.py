@@ -12,11 +12,17 @@ class Choice(BaseModel):
     index: Optional[int] = Field(default=0, description="选择项索引")
     finish_reason: Optional[str] = Field(default=None, description="结束原因")
 
+class Usage(BaseModel):
+    """token使用统计模型"""
+    input_tokens: int = Field(description="提示token数量")
+    output_tokens: int = Field(description="生成token数量")
+    total_tokens: int = Field(description="总token数量")
+
 class ChatResponse(BaseModel):
     """聊天响应模型"""
     choices: List[Choice] = Field(description="响应选项列表")
     model: Optional[str] = Field(default=None, description="使用的模型标识符")
-    usage: Optional[Dict[str, int]] = Field(default=None, description="token使用统计")
+    usage: Optional[Usage] = Field(default=None, description="token使用统计")
 
 class StreamDelta(BaseModel):
     """流式响应增量内容"""

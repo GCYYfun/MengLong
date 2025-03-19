@@ -42,6 +42,10 @@ class RoleAgent(Agent):
         self.role_var.update(message)
         self.role_system = self.role_system_template.substitute(self.role_var)
         self.context_manager.system = self.role_system
+    
+    def reset_system_prompt(self):
+        self.role_system = self.role_system_template.substitute(self.role_var)
+        self.context_manager.system = self.role_system
 
     def chat(self, input_messages):
         # 处理消息
