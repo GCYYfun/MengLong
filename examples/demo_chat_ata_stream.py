@@ -89,6 +89,10 @@ for chunk in ata.chat_stream():
             elif event_type == "reasoning_start":
                 current_speaker = event_speaker
                 print(f"\n\n```{current_speaker} thinking \n\n ", flush=True)
+            elif event_type == "stop":
+                print("========")
+                print("turn end")
+                print("========")
         # 处理对话内容
         if "data" in data:
             content = data["data"]

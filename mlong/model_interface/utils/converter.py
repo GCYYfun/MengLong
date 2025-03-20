@@ -55,7 +55,7 @@ class DeepseekConverter:
         """Normalize Deepseek stream response to match MLong's response format."""
         # 返回生成器
         for chunk in response_stream:
-            print("chunk:",chunk)
+            # print("chunk:",chunk)
             if chunk.choices:
                 if DeepseekConverter.reasoning:
                     delta = ContentDelta(

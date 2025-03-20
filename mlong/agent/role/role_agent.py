@@ -3,7 +3,7 @@ from string import Template
 
 from mlong.component import ContextManager
 from mlong.agent.agent import Agent
-
+from mlong.agent.schema import TextContentData,ReasoningContentData,StreamEvent
 
 class RoleAgent(Agent):
     def __init__(
@@ -79,23 +79,23 @@ class RoleAgent(Agent):
         for r in response:
             if r.message.delta.text_content is not None:
                 if text_start:
-                    text_start_event = f"{json.dumps({'event': f'text_start:{self.id}'})}"
+                    text_start_event = f"{json.dumps(StreamEvent(event=f"text_start:{self.id}").model_dump())}"
                     text_start = False
                     yield text_start_event
                 text = r.message.delta.text_content
                 cache_message.append(text)
-                yield f"{json.dumps({'data': text})}"
+                yield f"{json.dumps(TextContentData(data=text).model_dump())}"
             if r.message.delta.reasoning_content is not None:
                 if reasoning_start:
-                    reasoning_start_event = f"{json.dumps({'event': f'reasoning_start:{self.id}'})}"
+                    reasoning_start_event = f"{json.dumps(StreamEvent(event=f"reasoning_start:{self.id}").model_dump())}"
                     reasoning_start = False
                     yield reasoning_start_event
                 reason = r.message.delta.reasoning_content
                 reasoning_cache_message.append(reason)
-                yield f"{json.dumps({'reasoning_data': reason})}"
+                yield f"{json.dumps(ReasoningContentData(reasoning_data=reason).model_dump())}"
             if r.message.finish_reason is not None:
                 if r.message.finish_reason == "stop":
-                    end_event = f"{json.dumps({'event': f'stop:{self.id}'})}"
+                    end_event = f"{json.dumps(StreamEvent(event=f"stop:{self.id}").model_dump())}"
                     yield end_event
         self.context_manager.add_assistant_response("".join(cache_message))
 
