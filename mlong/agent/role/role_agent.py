@@ -47,15 +47,19 @@ class RoleAgent(Agent):
         self.role_system = self.role_system_template.substitute(self.role_var)
         self.context_manager.system = self.role_system
 
-    def chat(self, input_messages):
+    def chat(self, input_messages,**kwargs):
         # 处理消息
         self.context_manager.add_user_message(input_messages)
 
         messages = self.context_manager.messages
 
-        res = self.model.chat(messages=messages)
+        res = self.model.chat(messages=messages,**kwargs)
 
-        r = res.choices[0].message.content
+        r = res.message.content.text_content
+        if res.message.content.reasoning_content:
+            print("================================================")
+            print("reasoning_content:",res.message.content.reasoning_content)
+            print("================================================")
         self.context_manager.add_assistant_response(r)
 
         return r
@@ -63,37 +67,36 @@ class RoleAgent(Agent):
     def chat_stream(self, input_messages):
         reasoning_cache_message = []
         cache_message = []
+
+        reasoning_start = True
+        text_start = True
+
         self.context_manager.add_user_message(input_messages)
 
         messages = self.context_manager.messages
 
         response = self.model.chat(messages=messages, stream=True)
-        if response.stream:
-            for event in response.stream:
-                if "contentBlockDelta" in event:
-                    delta = event["contentBlockDelta"]["delta"]
-                    if "text" in delta:
-                        text = delta["text"]
-                        cache_message.append(text)
-                        yield f"{json.dumps({'data': text})}"
-                    if "reasoningContent" in delta:
-                        reason = delta["reasoningContent"]
-                        if "text" in reason:
-                            reason_text = reason["text"]
-                            reasoning_cache_message.append(reason_text)
-                            yield f"{json.dumps({'reasoning_data': reason_text})}"
-                        if "signature" in reason:
-                            signature = reason["signature"]
-                            yield f"{json.dumps({'event': f'signature:{signature}'})}"
-                if "messageStart" in event:
-                    message_start = event["messageStart"]
-                    role = message_start["role"]
-                    yield f"{json.dumps({'event': f'start:{role}-{self.id}'})}"
-                if "messageStop" in event:
-                    message_stop = event["messageStop"]
-                    reason = message_stop["stopReason"]
-                    yield f"{json.dumps({'event': f'stop:{reason}'})}"
-
+        for r in response:
+            if r.message.delta.text_content is not None:
+                if text_start:
+                    text_start_event = f"{json.dumps({'event': f'text_start:{self.id}'})}"
+                    text_start = False
+                    yield text_start_event
+                text = r.message.delta.text_content
+                cache_message.append(text)
+                yield f"{json.dumps({'data': text})}"
+            if r.message.delta.reasoning_content is not None:
+                if reasoning_start:
+                    reasoning_start_event = f"{json.dumps({'event': f'reasoning_start:{self.id}'})}"
+                    reasoning_start = False
+                    yield reasoning_start_event
+                reason = r.message.delta.reasoning_content
+                reasoning_cache_message.append(reason)
+                yield f"{json.dumps({'reasoning_data': reason})}"
+            if r.message.finish_reason is not None:
+                if r.message.finish_reason == "stop":
+                    end_event = f"{json.dumps({'event': f'stop:{self.id}'})}"
+                    yield end_event
         self.context_manager.add_assistant_response("".join(cache_message))
 
     def observe(self, env_status):

@@ -32,10 +32,10 @@ role_config2 = {
 
 # 对话主题模板
 topic_template = """
-[任务] 与${peer_name}进行符合自己性格与背景的聊天
-[描述] 你正在和${peer_name}进行自然对话。不必一定回复每句话。
+[任务] 与${peer_name}进行符合自己性格与背景的聊天，交互式聊天。
+[描述] 你正在和${peer_name}进行自然对话。不一定每句话都要回复。
 [规则]
-每段对话由两部分组成：(请严格遵守格式输出)
+每段对话由两部分组成：
 - 对话元信息：描述本次对话的状态。
 - 对话内容：描述本次对话的内容。
 
@@ -55,12 +55,13 @@ example:
 如果一方说完话，另一方无语则另一方输出[PASS]
 结束话题使用[END]符号结尾。
 
-交流大概5-8句话，然后自然的结束话题。
+互相交流,不要自言自语，等待对方反应，再继续对话，简单聊几句，然后自然的结束话题。
+思考推理要简明扼要，不要长篇大论。抓住重点，不要偏离主题，抓住重点。
 
 [对方信息]
 ${peer_info}
 
-接下来直接开始对话。
+接下来直接开始与对方对话。
 """
 
 # 初始化双角色对话
@@ -79,13 +80,22 @@ for chunk in ata.chat_stream():
         
         # 处理事件类型
         if "event" in data:
-            event_type = data["event"].split(":")[0]
-            if event_type == "start":
-                current_speaker = "Alice" if "Alice" in data["event"] else "Bob"
-                print(f"\n\n{current_speaker}: ", flush=True)
+            event_info = data["event"].split(":")
+            event_type = event_info[0]
+            event_speaker = event_info[1]
+            if event_type == "text_start":
+                current_speaker = event_speaker
+                print(f"\n\n{current_speaker}: \n", flush=True)
+            elif event_type == "reasoning_start":
+                current_speaker = event_speaker
+                print(f"\n\n```{current_speaker} thinking \n\n ", flush=True)
         # 处理对话内容
         if "data" in data:
             content = data["data"]
+            current_message += content
+            print(content, end="", flush=True)
+        if "reasoning_data" in data:
+            content = data["reasoning_data"]
             current_message += content
             print(content, end="", flush=True)
             

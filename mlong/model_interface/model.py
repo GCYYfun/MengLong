@@ -124,18 +124,22 @@ class Model:
         Raises:
             ValueError: 如果模型或提供商不支持
         """
+        # 默认检查
         if model_id is None:
             model_id = self.model_id
         else:
             if model_id not in MODEL_REGISTRY:
                 raise ValueError(f"Model {model_id} is not supported")
 
+        # 获取提供商和模型
         provider, model = MODEL_REGISTRY[model_id]
 
+        # 获取提供商实例
         model_client = self.get_or_create_client(provider)
         if not model_client:
             raise ValueError(f"Provider {provider} is not supported")
 
+        # 调用提供商的chat方法
         try:
             return model_client.chat(messages=messages, model_id=model_id, **kwargs)
         except Exception as e:

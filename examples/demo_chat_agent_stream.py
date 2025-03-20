@@ -36,8 +36,10 @@ for r in res:
     r = json.loads(r)
     match r:
         case {"event": event}:
-            print(event)
+            print(event, flush=True)
         case {"data": content}:
-            print(f"{content}", end="")
+            print(f"{content}", end="", flush=True)
+        case {"reasoning_data": content}:
+            print(f"{content}", end="", flush=True)
         case _:
             pass  # 忽略其他情况

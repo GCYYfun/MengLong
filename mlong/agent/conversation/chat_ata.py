@@ -13,9 +13,10 @@ class AgentToAgentChat:
         topic: dict = None,
         active_role: dict = None,
         passive_role: dict = None,
+        model_id: str = None,
     ):
-        self.active = RoleAgent(active_role)
-        self.passive = RoleAgent(passive_role)
+        self.active = RoleAgent(active_role,model_id=model_id)
+        self.passive = RoleAgent(passive_role,model_id=model_id)
 
         self.topic = Template(topic)
         self.add_topic_to_context()
