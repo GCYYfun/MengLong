@@ -1,22 +1,23 @@
 import json
 from string import Template
 
-from mlong.agent.role import RoleAgent
+from mlong.agent.role_play import GameAgent
 from mlong.component.context_manager import ATAContextManager
 
 
-class AgentToAgentChat:
+class GTGConversation:
     """Agent to Agent"""
 
     def __init__(
         self,
-        topic: dict = None,
+        topic=None,
         active_role: dict = None,
         passive_role: dict = None,
+        memory_space: str = None,
         model_id: str = None,
     ):
-        self.active = RoleAgent(active_role,model_id=model_id)
-        self.passive = RoleAgent(passive_role,model_id=model_id)
+        self.active = GameAgent(active_role, memory_space, model_id=model_id)
+        self.passive = GameAgent(passive_role, memory_space, model_id=model_id)
 
         self.topic = Template(topic)
         self.add_topic_to_context()
@@ -58,14 +59,14 @@ class AgentToAgentChat:
                 len(self.context_manager.topic.messages) == 0
                 or len(self.context_manager.topic.messages) == 1
             ):
-                active_res = self.active.chat(self.active_topic)
+                active_res = self.active.chat_with_mem(self.active_topic)
                 # print(f"[system]\n\n{self.active.context_manager.system}")
-                print(f"{self.active.role_info['name']}: \n{active_res}")
+                print(f"{self.active.role_info["name"]}: \n{active_res}")
                 # print()
             else:
-                active_res = self.active.chat(passive_res)
+                active_res = self.active.chat_with_mem(passive_res)
                 # print(f"[system]\n\n{self.active.context_manager.system}")
-                print(f"{self.active.role_info['name']}: \n{active_res}")
+                print(f"{self.active.role_info["name"]}: \n{active_res}")
                 # print()
 
             self.context_manager.topic.add_user_message(active_res)
@@ -73,9 +74,9 @@ class AgentToAgentChat:
             if self.is_over(a_res=active_res):
                 break
 
-            passive_res = self.passive.chat(active_res)
+            passive_res = self.passive.chat_with_mem(active_res)
             # print(f"[system]\n\n{self.passive.context_manager.system}")
-            print(f"{self.passive.role_info['name']}:  \n{passive_res}")
+            print(f"{self.passive.role_info["name"]}:  \n{passive_res}")
             # print()
             self.context_manager.topic.add_assistant_response(passive_res)
 
@@ -87,18 +88,29 @@ class AgentToAgentChat:
         messages = self.replace_role_name(
             messages, self.active.role_info["name"], self.passive.role_info["name"]
         )
-
+        # mem
+        self.active.summary()
+        self.passive.summary()
         return messages
 
     def chat_stream(self, topic=None):
         pending = True
         cache_message = []
+        cache_reasoning_message = []
         if topic is None:
             topic = self.topic
         index = 0
         # 当对话五次后结束
         active_res = ""
         passive_res = ""
+        print("===============System===================")
+        print(f"[active system]\n\n{self.active.context_manager.system}")
+        print("========================================")
+
+        print("===============System===================")
+        print(f"[passive system]\n\n{self.passive.context_manager.system}")
+        print("========================================")
+
         while pending:  # TODO Interrupted
             index += 1
             # print(f"对话次数: {index}")
@@ -107,48 +119,46 @@ class AgentToAgentChat:
                 len(self.context_manager.topic.messages) == 0
                 or len(self.context_manager.topic.messages) == 1
             ):
-                active_res = self.active.chat_stream(self.active_topic)
+                active_res = self.active.chat_stream_with_mem(self.active_topic)
                 for item in active_res:
-                    i = json.loads(item)
-                    if "data" in i:
-                        i = i["data"]
-                        cache_message.append(i)
-                    # print(item)
+                    if "data" in item:
+                        cache_message.append(item["data"])
+                    # if "reasoning_data" in item:
+                    #     cache_reasoning_message.append(item["reasoning_data"])
                     yield item
             else:
-                active_res = self.active.chat_stream(passive_res)
+                active_res = self.active.chat_stream_with_mem(passive_res)
                 for item in active_res:
-                    i = json.loads(item)
-                    if "data" in i:
-                        i = i["data"]
-                        cache_message.append(i)
-                    # print(item)
+                    if "data" in item:
+                        cache_message.append(item["data"])
+                    # if "reasoning_data" in item:
+                    #     cache_reasoning_message.append(item["reasoning_data"])
                     yield item
             active_res = "".join(cache_message)
             self.context_manager.topic.add_user_message(active_res)
+            cache_message.clear()
+            print(f"{self.active.role_info['name']}: \n{active_res}\n")
             # 检测回复包含结束标志
             if self.is_over(a_res=active_res):
-                # print("Active End")
                 pending = False
                 cache_message.clear()
                 break
-            # reset
-            cache_message.clear()
-            # print("PASSIVE:")
-            passive_res = self.passive.chat_stream(active_res)
+
+            passive_res = self.passive.chat_stream_with_mem(active_res)
             for item in passive_res:
-                i = json.loads(item)
-                if "data" in i:
-                    i = i["data"]
-                    cache_message.append(i)
-                # print(item)
+                if "data" in item:
+                    cache_message.append(item["data"])
                 yield item
             passive_res = "".join(cache_message)
             self.context_manager.topic.add_assistant_response(passive_res)
+            cache_message.clear()
+            print(f"{self.passive.role_info['name']}:  \n{passive_res}\n")
 
             if self.is_over(p_res=passive_res):
-                # print("Passive End")
                 pending = False
+                cache_message.clear()
+        self.active.summary()
+        self.passive.summary()
 
     def replace_role_name(self, messages, user, assistant):
         role_play_messages = messages

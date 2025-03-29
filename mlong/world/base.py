@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Callable
 
+
 class World(ABC):
     """环境交互基类"""
 
@@ -22,7 +23,7 @@ class World(ABC):
     @abstractmethod
     def reset(self, seed: int) -> Dict[str, Any]:
         """重置环境到初始混沌状态
-        
+
         Args:
             seed: 随机种子用于状态复现
         """

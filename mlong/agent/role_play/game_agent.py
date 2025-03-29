@@ -1,52 +1,40 @@
 import json
 from mlong.memory.short_term_memory import ShortTermMemory
 from mlong.memory.working_memory import WorkingMemory
-from mlong.agent.role.role_agent import RoleAgent
+from mlong.agent.role_play.role_agent import RoleAgent
 
 
-class FluctLight(RoleAgent):
+class GameAgent(RoleAgent):
     def __init__(
         self,
         role_config: dict = None,
         memory_space: str = None,
         model_id: str = None,
     ):
-        super(FluctLight, self).__init__(role_config, model_id)
+        super(GameAgent, self).__init__(role_config, model_id)
 
         if memory_space is None:
-            st_memory_file = "memory/memcache/short_term_memory.yaml"
             wm_memory_file = "memory/memcache/working_memory.yaml"
         else:
-            st_memory_file = f"{memory_space}/{self.id}_st_mem.yaml"
             wm_memory_file = f"{memory_space}/{self.id}_wm_mem.yaml"
 
-        self.st = ShortTermMemory(memory_file=st_memory_file)
         self.wm = WorkingMemory(memory_file=wm_memory_file)
 
     def chat_with_mem(self, input_messages):
         # some_thoughts = self.wm.central_executive(input_messages)
-        some_thoughts = self.st.shot_memory()
+        some_thoughts = self.wm.shot_memory()
         self.update_system_prompt({"daily_logs": some_thoughts})
 
         return self.chat(input_messages=input_messages)
 
     def chat_stream_with_mem(self, input_messages):
         # some_thoughts = self.wm.central_executive(input_messages)
-        some_thoughts = self.st.daily_logs
+        some_thoughts = self.wm.daily_logs
         self.update_system_prompt({"daily_logs": some_thoughts})
-
-        yield self.chat_stream(input_messages=input_messages)
+        return self.chat_stream(input_messages=input_messages)
 
     def summary(self):
-        p = """[对话结束,总结我们的对话,根据时间、地点、人物、事、备注的json格式输出,只关注对话内容，不要包含你个人的背景信息]
-        回复的json格式如下:
-        {
-            时间: str, 
-            地点: [str,], 
-            人物: [str,], 
-            事件: [str,], 
-            备注: [str,]
-        }
+        p = """
         """
         p2 = """
         [当前对话结束,以你的视角总结我们的对话,根据下面我提供的json格式输出,只关注对话内容，不要包含你个人的背景信息]
@@ -73,15 +61,27 @@ class FluctLight(RoleAgent):
             "总结": "事件的总结描述"
         }
         """
-        response = self.chat(input_messages=p)
-        self.st.daily_logs.append(response)
-        self.st.remember()
+        p3 = """
+        [当前对话结束,以你的视角总结我们的对话,根据下面我提供的json格式输出,只关注对话内容，不要包含你个人的背景信息]
+        回复的json格式如下:
+        {
+            "事件内容": "记录具体发生的事件或活动的细节",
+            "时间地点": "事件发生的时间和地点信息",
+            "关联人物": "涉及的人物及其互动",
+            "情感体验": "事件伴随的情绪或感受",
+            "事件结果": "事件的结果或影响",
+            "动作与行为": "个人或他人的具体行为",
+            "自传体属性": "与‘自我’的关联性"
+        }
+        """
+        response = self.chat(input_messages=p3)
+        self.wm.central_executive({"episode": response})
         return response
 
     def reset(self):
         self.reset_system_prompt()
         self.context_manager.clear()
-        self.st.reset()
+        self.wm.reset()
 
     def check_json_format(self, response):
         try:

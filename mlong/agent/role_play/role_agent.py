@@ -2,8 +2,17 @@ import json
 from string import Template
 
 from mlong.component import ContextManager
-from mlong.agent.agent import Agent
-from mlong.agent.schema import TextContentData,ReasoningContentData,StreamEvent
+from mlong.agent.role_play.agent import Agent
+from mlong.agent.schema import (
+    TextContentData,
+    ReasoningContentData,
+    StreamEvent,
+    START_TEXT,
+    START_REASONING,
+    END_REASONING,
+    END_TURN,
+)
+
 
 class RoleAgent(Agent):
     def __init__(
@@ -42,23 +51,23 @@ class RoleAgent(Agent):
         self.role_var.update(message)
         self.role_system = self.role_system_template.substitute(self.role_var)
         self.context_manager.system = self.role_system
-    
+
     def reset_system_prompt(self):
         self.role_system = self.role_system_template.substitute(self.role_var)
         self.context_manager.system = self.role_system
 
-    def chat(self, input_messages,**kwargs):
+    def chat(self, input_messages, **kwargs):
         # 处理消息
         self.context_manager.add_user_message(input_messages)
 
         messages = self.context_manager.messages
 
-        res = self.model.chat(messages=messages,**kwargs)
+        res = self.model.chat(messages=messages, **kwargs)
 
         r = res.message.content.text_content
         if res.message.content.reasoning_content:
             print("================================================")
-            print("reasoning_content:",res.message.content.reasoning_content)
+            print("reasoning_content:", res.message.content.reasoning_content)
             print("================================================")
         self.context_manager.add_assistant_response(r)
 
@@ -79,23 +88,39 @@ class RoleAgent(Agent):
         for r in response:
             if r.message.delta.text_content is not None:
                 if text_start:
-                    text_start_event = f"{json.dumps(StreamEvent(event=f"text_start:{self.id}").model_dump())}"
+                    text_start_event = (
+                        f"{StreamEvent(event=f"{START_TEXT}:{self.id}").model_dump()}"
+                    )
                     text_start = False
+                    print(f"[role_agent_stream_chat]:{text_start_event}")
                     yield text_start_event
                 text = r.message.delta.text_content
                 cache_message.append(text)
-                yield f"{json.dumps(TextContentData(data=text).model_dump())}"
+                text_data = TextContentData(data=text).model_dump()
+                print(f"[role_agent_stream_chat]:{text_data}")
+                yield text_data
             if r.message.delta.reasoning_content is not None:
                 if reasoning_start:
-                    reasoning_start_event = f"{json.dumps(StreamEvent(event=f"reasoning_start:{self.id}").model_dump())}"
+                    reasoning_start_event = f"{StreamEvent(event=f"{START_REASONING}:{self.id}").model_dump()}"
                     reasoning_start = False
+                    print(f"[role_agent_stream_chat]:{reasoning_start_event}")
                     yield reasoning_start_event
-                reason = r.message.delta.reasoning_content
-                reasoning_cache_message.append(reason)
-                yield f"{json.dumps(ReasoningContentData(reasoning_data=reason).model_dump())}"
+                reasoning = r.message.delta.reasoning_content
+                reasoning_cache_message.append(reasoning)
+                reasoning_data = ReasoningContentData(
+                    reasoning_data=reasoning
+                ).model_dump()
+                print(f"[role_agent_stream_chat]:{reasoning_data}")
+                yield reasoning_data
             if r.message.finish_reason is not None:
-                if r.message.finish_reason == "stop":
-                    end_event = f"{json.dumps(StreamEvent(event=f"stop:{self.id}").model_dump())}"
+                if (
+                    r.message.finish_reason == "end_turn"
+                    or r.message.finish_reason == "stop"
+                ):
+                    end_event = (
+                        f"{StreamEvent(event=f"{END_TURN}:{self.id}").model_dump()}"
+                    )
+                    print(f"[role_agent_stream_chat]:{end_event}")
                     yield end_event
         self.context_manager.add_assistant_response("".join(cache_message))
 

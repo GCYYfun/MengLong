@@ -5,7 +5,7 @@ import streamlit as st
 
 # 将项目根目录添加到路径中
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from mlong.agent.role import FluctLight
+from mlong.agent.role_play import FluctLight
 
 # 确保configs目录存在
 configs_dir = os.path.join(os.path.dirname(__file__), "configs")
@@ -13,14 +13,11 @@ if not os.path.exists(configs_dir):
     os.makedirs(configs_dir)
 
 # 页面配置
-st.set_page_config(
-    page_title="FluctLight 演示",
-    page_icon="🤖",
-    layout="wide"
-)
+st.set_page_config(page_title="FluctLight 演示", page_icon="🤖", layout="wide")
 
 # 应用全局样式 - 全面覆盖Streamlit默认样式
-st.markdown("""
+st.markdown(
+    """
 <style>
 /* ===== 全局样式与重置 ===== */
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
@@ -498,29 +495,34 @@ hr {
 }
 
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # 标题
 st.title("✨ FluctLight 智能对话系统")
-st.markdown("""
+st.markdown(
+    """
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 <p class="subtitle">
     <i class="fas fa-brain"></i> 基于记忆的智能角色 | 
     <i class="fas fa-comments"></i> 自然流畅的对话 | 
     <i class="fas fa-lightbulb"></i> 个性化体验
 </p>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # 侧边栏 - 角色配置
 with st.sidebar:
     st.header("⚙️ 角色设置")
-    
+
     name = st.text_input("名字", "Alice")
     gender = st.selectbox("性别", ["女", "男"])
     age = st.text_input("年龄", "18")
-    
+
     topic = st.text_area("主题设定", "", height=150)
-    
+
     if st.button("应用设置"):
         # 重新配置角色
         st.session_state.role_config = {
@@ -537,22 +539,22 @@ with st.sidebar:
         )
         st.session_state.messages = []
         st.success("角色设置已更新！")
-    
+
     st.markdown("---")
-    
+
     st.subheader("🧠 记忆管理")
-    
+
     if st.button("生成对话摘要"):
         summary = st.session_state.fluctlight.summary()
         st.code(summary, language="json")
-    
+
     if st.button("清除记忆"):
         st.session_state.fluctlight.reset()
         st.session_state.messages = []
         st.success("记忆已清除！")
 
 # 初始化会话状态
-if 'role_config' not in st.session_state:
+if "role_config" not in st.session_state:
     st.session_state.role_config = {
         "id": "Alice",
         "role_system": "你是一个中国${gender}性，你的名字叫${name}。\n\n${topic}\n\n${daily_logs}",
@@ -560,13 +562,12 @@ if 'role_config' not in st.session_state:
         "role_var": {"topic": "", "daily_logs": ""},
     }
 
-if 'fluctlight' not in st.session_state:
+if "fluctlight" not in st.session_state:
     st.session_state.fluctlight = FluctLight(
-        role_config=st.session_state.role_config,
-        memory_space=configs_dir
+        role_config=st.session_state.role_config, memory_space=configs_dir
     )
 
-if 'messages' not in st.session_state:
+if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # 显示系统提示信息
@@ -577,59 +578,66 @@ with st.expander("系统提示（点击展开查看）"):
 for message in st.session_state.messages:
     with st.container():
         if message["role"] == "user":
-            st.markdown(f"""
+            st.markdown(
+                f"""
             <div class="chat-message user">
                 <div><strong><i class="fas fa-user-circle"></i> 你:</strong></div>
                 <div class="message">{message["content"]}</div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
         else:
-            st.markdown(f"""
+            st.markdown(
+                f"""
             <div class="chat-message assistant">
                 <div><strong><i class="fas fa-robot"></i> {st.session_state.role_config["role_info"]["name"]}:</strong></div>
                 <div class="message">{message["content"]}</div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
 
-# 使用表单处理输入 
+# 使用表单处理输入
 with st.form("message_form", clear_on_submit=True):
     # 创建一个简单的两列布局
     c1, c2 = st.columns([7, 1])
-    
+
     with c1:
         # 直接放置输入框，不添加任何修饰
         user_input = st.text_input(
             label="",
             placeholder="请输入消息：",
-            label_visibility="collapsed", # 隐藏标签
-            key="user_input"
+            label_visibility="collapsed",  # 隐藏标签
+            key="user_input",
         )
-        
+
     with c2:
         # 按钮
         submit = st.form_submit_button("发送", use_container_width=True)
-    
+
     # 处理提交
     if submit and user_input:
         # 添加用户消息到聊天记录
         st.session_state.messages.append({"role": "user", "content": user_input})
-        
+
         # 获取 FluctLight 回复
         fl_response = st.session_state.fluctlight.chat_with_mem(user_input)
-        
+
         # 添加助手回复到聊天记录
         st.session_state.messages.append({"role": "assistant", "content": fl_response})
-        
+
         # 显示系统提示更新
         with st.expander("系统提示已更新（点击展开查看）"):
             st.code(st.session_state.fluctlight.system_prompt, language="markdown")
-        
+
         # 重新加载页面以显示新消息
         st.rerun()
 
 # 页脚
 st.markdown("---")
-st.markdown("""
+st.markdown(
+    """
 <div class="footer">
     <p>
         <i class="fas fa-code"></i> FluctLight 智能对话系统 
@@ -639,4 +647,6 @@ st.markdown("""
         <i class="fas fa-heart"></i> 2025
     </p>
 </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)

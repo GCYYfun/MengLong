@@ -2,7 +2,7 @@ import fastapi_poe as fp
 import asyncio
 import os
 from ..provider import Provider
-from ..utils.converter import PoeConverter
+from .converter import PoeConverter
 from ..schema.response import StreamMessage, ContentDelta, ChatStreamResponse
 
 
@@ -32,8 +32,13 @@ class PoeProvider(Provider):
                 return self.converter.normalize_response(response)
             except Exception as e:
                 return str(e)
-        response = asyncio.run(one_step(messages))
-        return response
+        
+        # 如果stream为True，则返回流式响应
+        if kwargs.get("stream", False):
+            return self.chat_stream(model_id, messages, **kwargs)
+        else:
+            response = asyncio.run(one_step(messages))
+            return response
         
     def chat_stream(self, model_id, messages, **kwargs):
         """
@@ -47,15 +52,15 @@ class PoeProvider(Provider):
         Returns:
             A generator yielding stream responses
         """
-        # 将异步生成器转换为同步生成器的辅助函数
+        # 使用类级别的事件循环
+        if not hasattr(self, '_loop'):
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+        
         def stream_wrapper():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
             async def get_stream():
                 try:
                     poe_messages = self.converter.convert_request(messages)
-                    index = 0
                     
                     async for partial in fp.get_bot_response(
                         messages=poe_messages,
@@ -72,6 +77,12 @@ class PoeProvider(Provider):
                             finish_reason=None  # 只有在流结束时才会有finish_reason
                         )
                         yield ChatStreamResponse(message=message)
+                    else:
+                        yield ChatStreamResponse(message=StreamMessage(
+                            delta=ContentDelta(text_content=""),
+                            finish_reason="stop"
+                        ))
+                        pass
                 except Exception as e:
                     # 在实际生产环境中，应该更妥善地处理异常
                     yield ChatStreamResponse(message=StreamMessage(
@@ -79,17 +90,27 @@ class PoeProvider(Provider):
                         finish_reason="error"
                     ))
             
-            # 使用loop.run_until_complete运行异步生成器，并逐个返回结果
+            # 使用类级别的事件循环
             async_gen = get_stream()
             try:
                 while True:
                     try:
-                        result = loop.run_until_complete(async_gen.__anext__())
+                        future = asyncio.ensure_future(async_gen.__anext__(), loop=self._loop)
+                        result = self._loop.run_until_complete(future)
                         yield result
                     except StopAsyncIteration:
                         break
             finally:
-                loop.close()
+                # 确保正确关闭异步生成器
+                if hasattr(async_gen, 'aclose'):
+                    self._loop.run_until_complete(async_gen.aclose())
+                # 确保取消所有未完成的任务
+                pending = asyncio.all_tasks(loop=self._loop)
+                for task in pending:
+                    task.cancel()
+                # 让事件循环处理所有任务取消
+                if pending:
+                    self._loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
                 
         # 返回同步生成器
         return stream_wrapper()

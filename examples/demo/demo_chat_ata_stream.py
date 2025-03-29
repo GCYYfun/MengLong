@@ -1,9 +1,9 @@
 import json
-from mlong.agent.conversation.chat_ata import AgentToAgentChat
+from mlong.agent.conversation.conversation_ata import AgentToAgentChat
 
 # 角色配置
 role_config1 = {
-    "id":"Alice",
+    "id": "Alice",
     "role_system": """
     你是一个中国${gender}性，名字叫${name}，年龄${age}岁。
     ----background----
@@ -13,11 +13,11 @@ role_config1 = {
     ----background----
     """,
     "role_info": {"name": "Alice", "gender": "女", "age": "18"},
-    "role_var": {"topic": "", "daily_logs": ""}
+    "role_var": {"topic": "", "daily_logs": ""},
 }
 
 role_config2 = {
-    "id":"Bob",
+    "id": "Bob",
     "role_system": """
     你是一个中国${gender}性，名字叫${name}，年龄${age}岁。    
     ----background----
@@ -27,7 +27,7 @@ role_config2 = {
     ----background----
     """,
     "role_info": {"name": "Bob", "gender": "男", "age": "25"},
-    "role_var": {"topic": "", "daily_logs": ""}
+    "role_var": {"topic": "", "daily_logs": ""},
 }
 
 # 对话主题模板
@@ -61,14 +61,12 @@ example:
 [对方信息]
 ${peer_info}
 
-接下来直接开始与对方对话。
+接下来直接开始对话。中文输出。
 """
 
 # 初始化双角色对话
 ata = AgentToAgentChat(
-    active_role=role_config1,
-    passive_role=role_config2,
-    topic=topic_template
+    active_role=role_config1, passive_role=role_config2, topic=topic_template
 )
 
 # 流式对话处理
@@ -77,7 +75,7 @@ current_message = ""
 for chunk in ata.chat_stream():
     try:
         data = json.loads(chunk)
-        
+
         # 处理事件类型
         if "event" in data:
             event_info = data["event"].split(":")
@@ -102,7 +100,7 @@ for chunk in ata.chat_stream():
             content = data["reasoning_data"]
             current_message += content
             print(content, end="", flush=True)
-            
+
     except json.JSONDecodeError:
         pass
 

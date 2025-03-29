@@ -1,7 +1,7 @@
 import openai
 import os
 from ..provider import Provider
-from ..utils.converter import OpenAIConverter
+from .converter import OpenAIConverter
 from ..schema.response import ChatResponse, ChatStreamResponse, Message, Content, EmbedResponse, StreamMessage, ContentDelta
 
 class OpenaiProvider(Provider):
@@ -36,7 +36,7 @@ class OpenaiProvider(Provider):
                 messages=messages,
                 **kwargs,  # Pass any additional arguments to the OpenAI API
             )
-            return response
+            return self.converter.normalize_response(response)
         except Exception as e:
             raise f"An error occurred: {e}"
             
@@ -52,46 +52,40 @@ class OpenaiProvider(Provider):
         Returns:
             A generator yielding stream responses
         """
-        try:
-            # 设置流式响应参数
-            kwargs["stream"] = True
+        # 设置流式响应参数
+        kwargs["stream"] = True
             
             # 创建流式响应
-            response_stream = self.client.chat.completions.create(
+        response_stream = self.client.chat.completions.create(
                 model=model_id,
                 messages=messages,
                 **kwargs
             )
+
+        return self.converter.normalize_stream_response(response_stream)
             
             # 返回生成器
-            for chunk in response_stream:
-                if chunk.choices:
-                    choice = chunk.choices[0]
-                    # 如果delta中有content字段
-                    content = choice.delta.content if hasattr(choice.delta, 'content') and choice.delta.content else None
+            # for chunk in response_stream:
+            #     if chunk.choices:
+            #         choice = chunk.choices[0]
+            #         # 如果delta中有content字段
+            #         content = choice.delta.content if hasattr(choice.delta, 'content') and choice.delta.content else None
                     
-                    # 检查是否有推理内容（对于某些模型，如GPT-4 Turbo可能有）
-                    reasoning_content = None
-                    if hasattr(choice.delta, 'tool_calls') and choice.delta.tool_calls:
-                        # 这里假设reasoning_content可能存储在tool_calls中
-                        # 具体实现可能需要根据实际情况调整
-                        pass
+            #         # 检查是否有推理内容（对于某些模型，如GPT-4 Turbo可能有）
+            #         reasoning_content = None
+            #         if hasattr(choice.delta, 'tool_calls') and choice.delta.tool_calls:
+            #             # 这里假设reasoning_content可能存储在tool_calls中
+            #             # 具体实现可能需要根据实际情况调整
+            #             pass
                         
-                    delta = ContentDelta(
-                        text_content=content,
-                        reasoning_content=reasoning_content
-                    )
+            #         delta = ContentDelta(
+            #             text_content=content,
+            #             reasoning_content=reasoning_content
+            #         )
                     
-                    stream_choice = StreamMessage(
-                        delta=delta,
-                        finish_reason=choice.finish_reason
-                    )
+            #         stream_choice = StreamMessage(
+            #             delta=delta,
+            #             finish_reason=choice.finish_reason
+            #         )
                     
-                    yield ChatStreamResponse(message=stream_choice)
-                    
-        except Exception as e:
-            # 在实际生产环境中，应该更妥善地处理异常
-            yield ChatStreamResponse(message=StreamMessage(
-                delta=ContentDelta(text_content=f"错误: {str(e)}"),
-                finish_reason="error"
-            ))
+            #         yield ChatStreamResponse(message=stream_choice)

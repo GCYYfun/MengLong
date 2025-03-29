@@ -1,4 +1,4 @@
-from mlong.agent.conversation.chat_ata import AgentToAgentChat
+from mlong.agent.conversation.conversation_ata import AgentToAgentChat
 
 # role_config1 = {
 #     "id": "Alice",
@@ -53,17 +53,17 @@ from mlong.agent.conversation.chat_ata import AgentToAgentChat
 
 # 角色配置
 role_config1 = {
-    "id":"Alice",
-    "role_system": "你是一个中国${gender}性，名字叫${name}，年龄${age}岁。\n\n${topic}\n\n${daily_logs}",
-    "role_info": {"name": "Alice", "gender": "女", "age": "18"},
-    "role_var": {"topic": "", "daily_logs": ""}
+    "id": "柳天天",
+    "role_system": "你扮演一个${gender}性，名字叫${name}，年龄${age}岁。\n\n${topic}\n\n${daily_logs}",
+    "role_info": {"name": "柳天天", "gender": "女", "age": "20"},
+    "role_var": {"topic": "", "daily_logs": ""},
 }
 
 role_config2 = {
-    "id":"Bob",
-    "role_system": "你是一个中国${gender}性，名字叫${name}，年龄${age}岁。\n\n${topic}\n\n${daily_logs}",
-    "role_info": {"name": "Bob", "gender": "男", "age": "25"},
-    "role_var": {"topic": "", "daily_logs": ""}
+    "id": "叶凡",
+    "role_system": "你扮演一个${gender}性，名字叫${name}，年龄${age}岁。\n\n${topic}\n\n${daily_logs}",
+    "role_info": {"name": "叶凡", "gender": "男", "age": "25"},
+    "role_var": {"topic": "", "daily_logs": ""},
 }
 
 # 对话主题模板
@@ -91,17 +91,21 @@ example:
 如果一方说完话，另一方无语则另一方输出[PASS]
 结束话题使用[END]符号结尾。
 
-互相交流,不要自言自语，等待对方反应，再继续对话，简单聊几句，然后自然的结束话题。
+互相交流,不要自言自语，等待对方反应，再继续对话，简单聊几句，每人每句最多20个字，然后自然的结束话题。
 思考推理要简明扼要，不要长篇大论。抓住重点，不要偏离主题，抓住重点。
 
 [对方信息]
 ${peer_info}
 
-接下来直接开始与对方对话。
+接下来直接开始对话。中文输出。
 """
 
 
-ata = AgentToAgentChat(active_role=role_config1, passive_role=role_config2, topic=topic_template,)
+ata = AgentToAgentChat(
+    active_role=role_config1,
+    passive_role=role_config2,
+    topic=topic_template,
+)
 
 res = ata.chat()
 print(res)

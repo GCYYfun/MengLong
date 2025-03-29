@@ -3,7 +3,7 @@ import sys
 import yaml
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-from mlong.agent.role import FluctLight
+from mlong.agent.role_play import GameAgent
 
 
 # 角色配置
@@ -20,7 +20,7 @@ if not os.path.exists(configs_dir):
     os.makedirs(configs_dir)
 
 # 使用configs目录中的记忆文件
-fl = FluctLight(
+fl = GameAgent(
     role_config=role_config,
     st_memory_file=os.path.join(configs_dir, "fl_st.yaml"),
     wm_memory_file=os.path.join(configs_dir, "fl_wm.yaml"),
@@ -30,10 +30,10 @@ fl = FluctLight(
 print("输入'exit'退出对话")
 while True:
     message = input("\n请输入消息：")
-    if message.lower() == 'exit':
+    if message.lower() == "exit":
         fl.summary()
         break
-    if message.lower() == 'clear':
+    if message.lower() == "clear":
         fl.clear()
         break
     res = fl.chat_with_mem(message)

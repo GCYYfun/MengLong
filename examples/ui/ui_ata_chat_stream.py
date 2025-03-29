@@ -9,21 +9,21 @@ import os
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from mlong.agent.conversation.chat_ata import AgentToAgentChat
+from mlong.agent.conversation.conversation_ata import AgentToAgentChat
 
 # 角色配置
 role_config1 = {
-    "id":"Alice",
+    "id": "Alice",
     "role_system": "你是一个中国${gender}性，名字叫${name}，年龄${age}岁。\n\n${topic}\n\n${daily_logs}",
     "role_info": {"name": "Alice", "gender": "女", "age": "18"},
-    "role_var": {"topic": "", "daily_logs": ""}
+    "role_var": {"topic": "", "daily_logs": ""},
 }
 
 role_config2 = {
-    "id":"Bob",
+    "id": "Bob",
     "role_system": "你是一个中国${gender}性，名字叫${name}，年龄${age}岁。\n\n${topic}\n\n${daily_logs}",
     "role_info": {"name": "Bob", "gender": "男", "age": "25"},
-    "role_var": {"topic": "", "daily_logs": ""}
+    "role_var": {"topic": "", "daily_logs": ""},
 }
 
 # 对话主题模板
@@ -64,7 +64,8 @@ st.set_page_config(page_title="AI角色对话剧场", page_icon="🎭", layout="
 st.title("🎭 双AI角色情景对话")
 
 # CSS样式定制
-st.markdown("""
+st.markdown(
+    """
 <style>
 .chat-container {
     border-radius: 15px;
@@ -124,29 +125,29 @@ st.markdown("""
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # 初始化会话状态
-if 'conversation' not in st.session_state:
+if "conversation" not in st.session_state:
     st.session_state.conversation = []
-if 'ata' not in st.session_state:
+if "ata" not in st.session_state:
     st.session_state.ata = AgentToAgentChat(
-        active_role=role_config1,
-        passive_role=role_config2,
-        topic=topic_template
+        active_role=role_config1, passive_role=role_config2, topic=topic_template
     )
 
 # 创建两栏布局
 # 删除双栏布局代码
 
 # 对话控制按钮
-if st.button('🚀 开始对话', use_container_width=True, key='start_chat'):
+if st.button("🚀 开始对话", use_container_width=True, key="start_chat"):
     st.session_state.conversation = []
     st.session_state.disabled = True
-    with st.spinner('角色正在准备中...'):
+    with st.spinner("角色正在准备中..."):
         full_response = ""
         placeholder = st.empty()
-        
+
         # [Stream Processing 流式处理]
         # 实时处理对话引擎的事件流，包含两种数据类型：
         # 1. 事件类型：标记对话开始/结束
@@ -165,24 +166,35 @@ if st.button('🚀 开始对话', use_container_width=True, key='start_chat'):
                     event_type = data["event"].split(":")[0]
                     if event_type == "start":
                         current_speaker = "Alice" if "Alice" in data["event"] else "Bob"
-                        st.session_state.conversation.append({"role": current_speaker, "content": ""})
+                        st.session_state.conversation.append(
+                            {"role": current_speaker, "content": ""}
+                        )
                     # elif event_type == "stop":
                     #     break
-                
+
                 # [Content Processing 内容处理]
                 # 将数据块追加到当前说话者的对话记录
                 # Appends data chunks to current speaker's conversation
                 if "data" in data:
                     if st.session_state.conversation:
                         st.session_state.conversation[-1]["content"] += data["data"]
-                        
+
                         # 实时更新界面
                         with placeholder.container():
-                                for msg in st.session_state.conversation:
-                                    with chat_message(name=msg["role"], avatar="user" if msg["role"] == "Alice" else "assistant"):
-                                        st.markdown(msg["content"])
-                                        st.caption(f"{time.strftime('%H:%M', time.localtime())}")
-            
+                            for msg in st.session_state.conversation:
+                                with chat_message(
+                                    name=msg["role"],
+                                    avatar=(
+                                        "user"
+                                        if msg["role"] == "Alice"
+                                        else "assistant"
+                                    ),
+                                ):
+                                    st.markdown(msg["content"])
+                                    st.caption(
+                                        f"{time.strftime('%H:%M', time.localtime())}"
+                                    )
+
             except json.JSONDecodeError:
                 pass
 

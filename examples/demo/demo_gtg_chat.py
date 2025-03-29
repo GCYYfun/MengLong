@@ -1,10 +1,10 @@
-
 import os
-from mlong.agent.conversation.chat_ftf import FLToFLChat
+from mlong.agent.conversation.conversation_gtg import GTGConversation
+
 
 # 角色配置
 active_role = {
-    "id":"js",
+    "id": "js",
     "role_system": """
     你是一个擅长分布式系统设计的工程师，用简洁的技术术语交流。 
     个人信息如下:
@@ -20,14 +20,11 @@ active_role = {
         "name": "js",
         "title": "技术专家",
     },
-    "role_var": {
-        "topic": "",
-        "daily_logs": ""
-    }
+    "role_var": {"topic": "", "daily_logs": ""},
 }
 
 passive_role = {
-    "id":"cp",
+    "id": "cp",
     "role_system": """
     你是一个擅长产品需求管理的专家，能够准确识别业务价值。  
     个人信息如下:
@@ -39,14 +36,8 @@ passive_role = {
     ${daily_logs}
     ----background----
     """,
-    "role_info": {
-        "name": "cp",
-        "title": "产品经理"
-    },
-    "role_var": {
-        "topic": "",
-        "daily_logs": ""
-    }
+    "role_info": {"name": "cp", "title": "产品经理"},
+    "role_var": {"topic": "", "daily_logs": ""},
 }
 
 # # 对话主题模板
@@ -90,13 +81,14 @@ ${peer_info}
 接下来直接开始对话。
 """
 
+
 def main():
     # 初始化双代理对话
-    chat_session = FLToFLChat(
+    chat_session = GTGConversation(
         topic=topic_template,
         active_role=active_role,
         passive_role=passive_role,
-        memory_space=os.path.join(os.path.dirname(__file__))
+        memory_space=os.path.join(os.path.dirname(__file__)),
     )
 
     # 开始对话
@@ -110,7 +102,7 @@ def main():
     #     try:
     #         print(chunk)
     #         data = json.loads(chunk)
-            
+
     #         # 处理事件类型
     #         if "event" in data:
     #             event_type = data["event"].split(":")[0]
@@ -122,10 +114,11 @@ def main():
     #             content = data["data"]
     #             current_message += content
     #             print(content, end="", flush=True)
-                
+
     #     except json.JSONDecodeError:
     #         pass
     # print("\n\n对话结束")
+
 
 if __name__ == "__main__":
     main()
