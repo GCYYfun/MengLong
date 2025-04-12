@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mlong"
+version = "0.1.0"
+description = "基于大语言模型(LLM)的智能体(agent)开发框架"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "MengLong Contributors", email = "your.email@example.com"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "openai",
+    "anthropic",
+    "boto3",
+    "pyyaml",
+    # 添加其他依赖项...
+]
+
+[project.urls]
+"Homepage" = "https://github.com/GCYYfun/MengLong"
+"Bug Tracker" = "https://github.com/GCYYfun/MengLong/issues"
+"Documentation" = "https://github.com/GCYYfun/MengLong/tree/main/docs"
+
+[tool.setuptools]
+# 告诉setuptools查找包
+packages = ["mlong"]
+
+# 指定要包含的数据文件，替代MANIFEST.in的功能
+[tool.setuptools.package-data]
+"*" = ["LICENSE", "README.md"]  # 项目根目录的文件
+"mlong.prompts" = ["**/*"]      # prompts目录下的所有文件
+"mlong.config" = ["**/*"]       # config目录下的所有文件

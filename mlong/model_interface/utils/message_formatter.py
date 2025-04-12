@@ -33,23 +33,6 @@ def assistant(text: str) -> Dict[str, str]:
     }
 
 
-@override
-def assistant(tool_calls=None) -> Dict[str, str]:
-    """
-    创建助手角色的消息格式
-    Args:
-        tool_call_id: 工具调用 ID
-        name: 工具名称
-    Returns:
-        格式化的助手消息字典
-    """
-    return {
-        "role": "assistant",
-        "content": None,
-        "tool_calls": tool_calls,
-    }
-
-
 def system(text: str) -> Dict[str, str]:
     """
     创建系统角色的消息格式

@@ -83,7 +83,6 @@ class RoleAgent(Agent):
         self.context_manager.add_user_message(input_messages)
 
         messages = self.context_manager.messages
-
         response = self.model.chat(messages=messages, stream=True)
         for r in response:
             if r.message.delta.text_content is not None:

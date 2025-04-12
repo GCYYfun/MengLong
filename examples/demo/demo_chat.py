@@ -3,7 +3,8 @@ from mlong.model_interface.utils import user
 
 model = Model()
 res = model.chat(
-    messages=[user("你好,你是谁？简单回复一下")], model_id="us.amazon.nova-pro-v1:0"
+    messages=[user("你好,你是谁？简单回复一下")],
+    model_id="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
 )
 print(res)
 

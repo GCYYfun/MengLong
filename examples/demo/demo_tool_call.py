@@ -137,7 +137,7 @@ def deepseek_tool_call_demo():
     """Demo of tool calls using DeepSeek models"""
     print("\n=== DeepSeek Tool Call Demo ===\n")
 
-    model = Model()
+    model = Model(model_id="deepseek-chat")
 
     # System message that instructs the model to use tools
     messages = [
@@ -150,15 +150,16 @@ def deepseek_tool_call_demo():
     # Call the model with tool definitions
     response = model.chat(
         messages=messages,
-        model_id="deepseek-chat",  # Using DeepSeek chat model
+        model_id="deepseek-reasoner",  # Using DeepSeek chat model
         tools=[weather_tool],
         tool_choice="auto",
     )
 
     # Check if there are tool calls in the response
-    if hasattr(response, "tool_calls") and response.tool_calls:
+    if hasattr(response.message, "tool_calls") and response.message.tool_calls:
         print("Model requested to use a tool:")
-        for tool_call in response.tool_calls:
+        for tool_call in response.message.tool_calls:
+            print(tool_call)
             print(f"Tool: {tool_call.function.name}")
             print(f"Arguments: {tool_call.function.arguments}")
 
@@ -168,9 +169,9 @@ def deepseek_tool_call_demo():
                 weather_result = get_weather(**args)
 
                 # Add the tool response to messages
+
                 messages.append(
                     assistant(
-                        content=None,
                         tool_calls=[
                             {
                                 "id": tool_call.id,
@@ -192,10 +193,10 @@ def deepseek_tool_call_demo():
         # Get the final response from the model
         final_response = model.chat(messages=messages, model_id="deepseek-chat")
         print("\nFinal Response:")
-        print(final_response.content)
+        print(final_response.message.content)
     else:
         print("No tool calls were made.")
-        print("Response:", response.content)
+        print("Response:", response.message.content)
 
 
 def main():
@@ -204,10 +205,10 @@ def main():
 
     # try:
     # Run OpenAI tool call demo
-    openai_tool_call_demo()
+    # openai_tool_call_demo()
 
     # Run DeepSeek tool call demo
-    # deepseek_tool_call_demo()
+    deepseek_tool_call_demo()
 
     # except Exception as e:
     #     print(f"Error during demo: {e}")

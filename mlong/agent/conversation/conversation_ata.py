@@ -109,19 +109,19 @@ class AgentToAgentChat:
             ):
                 active_res = self.active.chat_stream(self.active_topic)
                 for item in active_res:
-                    i = json.loads(item)
-                    if "data" in i:
-                        i = i["data"]
-                        cache_message.append(i)
+                    # i = json.loads(item)
+                    if "data" in item:
+                        item = item["data"]
+                        cache_message.append(item)
                     # print(item)
                     yield item
             else:
                 active_res = self.active.chat_stream(passive_res)
                 for item in active_res:
-                    i = json.loads(item)
-                    if "data" in i:
-                        i = i["data"]
-                        cache_message.append(i)
+                    # i = json.loads(item)
+                    if "data" in item:
+                        item = item["data"]
+                        cache_message.append(item)
                     # print(item)
                     yield item
             active_res = "".join(cache_message)
@@ -137,10 +137,10 @@ class AgentToAgentChat:
             # print("PASSIVE:")
             passive_res = self.passive.chat_stream(active_res)
             for item in passive_res:
-                i = json.loads(item)
-                if "data" in i:
-                    i = i["data"]
-                    cache_message.append(i)
+                # i = json.loads(item)
+                if "data" in item:
+                    item = item["data"]
+                    cache_message.append(item)
                 # print(item)
                 yield item
             passive_res = "".join(cache_message)

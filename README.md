@@ -22,14 +22,22 @@
 ### Installation
 
 ```bash
-# 从源码安装
+# 方法1: 从源码安装
 git clone https://github.com/GCYYfun/MengLong.git
 cd MengLong
 pip install -e .
 
-# 或者直接通过pip安装（一旦发布到PyPI）
+# 方法2: 从PyPI安装(一旦发布到PyPI)
 # pip install mlong
+
+# 方法3: 直接从GitHub安装
+pip install git+https://github.com/GCYYfun/MengLong.git
+
+# 使用uv快速安装(推荐)
+uv pip install git+https://github.com/GCYYfun/MengLong.git
 ```
+
+MengLong现在使用现代化的`pyproject.toml`配置，完全符合PEP 621标准，可以被任何现代Python包管理工具安装，包括pip、uv、poetry等。
 
 ### Quick Start
 
@@ -150,6 +158,49 @@ memory:
 
 更多示例配置可以在`examples/example_configs/`目录下找到。
 
+## 开发者指南
+
+### 项目结构
+
+MengLong采用现代Python项目结构，使用`pyproject.toml`进行配置。项目的主要结构：
+
+```
+mlong/              # 主包目录
+├── __init__.py     # 包初始化
+├── agent/          # 智能体实现
+├── component/      # 组件模块
+├── memory/         # 记忆系统
+├── model_interface/# 模型接口
+├── prompts/        # 提示模板
+├── retrieval/      # 检索相关功能
+├── schema/         # 数据模式定义
+├── tools/          # 工具集成
+├── workflow/       # 工作流功能
+└── world/          # 世界模拟环境
+```
+
+### 安装开发版本
+
+对于想要参与开发的贡献者，建议使用开发模式安装：
+
+```bash
+# 克隆仓库
+git clone https://github.com/GCYYfun/MengLong.git
+cd MengLong
+
+# 安装开发依赖
+pip install -e ".[dev]"  # 如果已在pyproject.toml中定义了dev依赖
+
+# 或使用uv安装（更快）
+uv pip install -e ".[dev]"
+```
+
+### 运行测试
+
+```bash
+pytest test/
+```
+
 ## Contributing
 
 欢迎贡献代码、提交问题或建议！
@@ -159,28 +210,3 @@ memory:
 3. 提交你的更改 (`git commit -m 'Add some amazing feature'`)
 4. 推送到分支 (`git push origin feature/amazing-feature`)
 5. 开启一个 Pull Request
-
-## License
-
-MIT License
-
-Copyright (c) 2023-2024 MengLong Contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
