@@ -109,7 +109,7 @@ def main():
     # logger = get_logger()
     # logger.debug("初始化模型...")
 
-    model = Model()
+    model = Model(model_id="claude-3-7-sonnet-20250219")
 
     normal_chat(model)
     # thinking_chat(model)

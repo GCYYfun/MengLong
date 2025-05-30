@@ -138,6 +138,8 @@ class Model:
         if not model_client:
             raise ValueError(f"Provider {provider} is not supported")
 
+        if messages is None or not isinstance(messages, list):
+            raise ValueError("Messages must be a non-empty list")
         # 调用提供商的chat方法
         # try:
         return model_client.chat(messages=messages, model_id=model_id, **kwargs)

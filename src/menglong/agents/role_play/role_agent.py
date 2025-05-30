@@ -41,10 +41,11 @@ class RoleAgent(Agent):
         self.context_manager.system = self.role_system
 
     def load_role_config(self):
-        self.role_system_template = Template(self.role_config["role_system"])
-        self.role_var = self.role_config["role_var"]
-        self.role_info = self.role_config["role_info"]
-        self.role_var.update(self.role_info)
+        # self.role_system_template = Template(self.role_config["role_system"])
+        self.role_system_template = Template(self.role_config["system"])
+        self.role_var = self.role_config["variable"]
+        # self.role_info = self.role_config["role_info"]
+        # self.role_var.update(self.role_info)
         self.role_system = self.role_system_template.substitute(self.role_var)
 
     def update_system_prompt(self, message):

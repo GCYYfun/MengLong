@@ -72,7 +72,7 @@ class AwsConverter(BaseConverter):
                     )
             elif isinstance(message, AssistantMessage):
                 prompt_messages.append(
-                    {"role": message.role, "content": message.content}
+                    {"role": message.role, "content": [{"text": message.content}]}
                 )
             elif isinstance(message, Message):
                 # 处理助手消息的列表内容

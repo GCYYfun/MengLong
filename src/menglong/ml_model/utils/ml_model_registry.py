@@ -48,4 +48,8 @@ MODEL_REGISTRY: Dict[str, Tuple[str, str]] = {
         "infinigence",
         "deepseek-r1",
     ),
+    "claude-3-7-sonnet-20250219": (
+        "infinigence",
+        "claude-3-7-sonnet-20250219",
+    ),
 }
