@@ -20,21 +20,41 @@ def load_config(config_path: str = ".configs.toml") -> Dict[str, Any]:
     # 使用Path对象处理路径
     config_path = Path(config_path)
 
-    # 如果是相对路径，则相对于项目根目录
+    # 如果是相对路径，则尝试多种策略来定位配置文件
     if not config_path.is_absolute():
-        # 获取当前文件的路径
-        current_file = Path(__file__).resolve()
+        # 1. 首先，尝试从当前工作目录加载（适用于作为库被其他项目使用的情况）
+        cwd_config = Path.cwd() / config_path
+        if cwd_config.exists():
+            rich_print(
+                f"在当前工作目录找到配置文件: {cwd_config}", RichMessageType.INFO
+            )
+            config_path = cwd_config
+        else:
+            # 2. 获取当前文件的路径
+            current_file = Path(__file__).resolve()
 
-        # 项目根目录：找到包含src目录的父级目录
-        project_root = current_file.parent
-        while project_root.name != "src" and project_root.parent != project_root:
-            project_root = project_root.parent
+            # 3. 尝试查找原项目的根目录：找到包含src目录的父级目录
+            project_root = current_file.parent
+            while project_root.name != "src" and project_root.parent != project_root:
+                project_root = project_root.parent
 
-        # 如果找到了src目录，再上一级就是项目根目录
-        if project_root.name == "src":
-            project_root = project_root.parent
+            # 如果找到了src目录，再上一级就是项目根目录
+            if project_root.name == "src":
+                project_root = project_root.parent
+                lib_config_path = project_root / config_path
 
-        config_path = project_root / config_path
+                if lib_config_path.exists():
+                    rich_print(
+                        f"在库项目根目录找到配置文件: {lib_config_path}",
+                        RichMessageType.INFO,
+                    )
+                    config_path = lib_config_path
+                else:
+                    # 4. 如果库项目根目录也没有找到，保持原始路径（可能之后会提示不存在）
+                    rich_print(
+                        f"未找到配置文件，将使用原始路径: {config_path}",
+                        RichMessageType.WARNING,
+                    )
 
     rich_print(f"{config_path}", RichMessageType.INFO, title="尝试加载配置文件")
 
@@ -53,10 +73,3 @@ def load_config(config_path: str = ".configs.toml") -> Dict[str, Any]:
     else:
         rich_print(f"配置文件不存在: {config_path}", RichMessageType.WARNING)
         return {}
-
-
-MODEL_LIST = {
-    "gpt-3.5-turbo": ("openai", "gpt-3.5-turbo"),
-    "gpt-4": ("openai", "gpt-4"),
-    "gpt-4-32k": ("openai", "gpt-4-32k"),
-}

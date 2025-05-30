@@ -8,7 +8,7 @@ payload = {
 }
 headers = {
     "Content-Type": "application/json",
-    "Authorization": "Bearer YOUR_API_KEY",  # Replace with your actual API key
+    "Authorization": "Bearer Your_API_Key",  # Replace with your actual API key
 }
 
 response = requests.post(url, json=payload, headers=headers)
