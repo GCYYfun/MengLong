@@ -1,3 +1,0 @@
-streamlit
-pyyaml
-# 如果您尚未安装 mlong，请按照项目主目录的 README.md 指示进行安装

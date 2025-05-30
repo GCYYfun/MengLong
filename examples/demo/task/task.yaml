@@ -1,0 +1,46 @@
+metadata: # (可选:程序添加)
+  name: "示例任务配置"
+  description: |
+    目的描述
+  version: "1.0"
+  context:  # 全局上下文定义
+    env_vars: |
+      env status
+
+tasks:
+  - id: task_001
+    description: "准备基础运行环境"
+    name: "function name"
+    params:  # 参数定义
+      x: 10
+      y: 20
+    depends_on:  # 显式依赖定义
+      - task_001:success  # success/failure/complete
+      - task_002:success
+
+  - id: task_002
+    name: "数据库迁移"
+    depends_on:  # 显式依赖定义
+      - task_001:success
+    params:
+      schema_version: "v2.3"
+
+  - id: task_003
+    name: "并行处理任务组"
+    children:  # 子任务定义
+      - id: sub_task_1
+        depends_on: 
+          - task_002:complete
+      - id: sub_task_2
+        start_condition: "{{checkpoint.task_001.exists}}"
+
+task_groups:
+  - stage: 1
+    mode: parallel  # serial/parallel
+    tasks: 
+      - task_001
+      - task_002
+  - stage: 2
+    mode: serial
+    tasks: 
+      - task_003
