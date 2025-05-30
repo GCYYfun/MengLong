@@ -109,9 +109,7 @@ def main():
     # logger = get_logger()
     # logger.debug("初始化模型...")
 
-    model = Model(
-        model_id="deepseek-r1",
-    )
+    model = Model()
 
     normal_chat(model)
     # thinking_chat(model)

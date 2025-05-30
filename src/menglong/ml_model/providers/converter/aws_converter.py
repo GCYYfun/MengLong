@@ -98,6 +98,7 @@ class AwsConverter(BaseConverter):
     @staticmethod
     def normalize_response(response):
         """将AWS响应标准化为MLong的响应格式。"""
+        # print("response:", response) # for debug
         output = response.get("output")
         content = Content(text=None)
         # message = Message(content=content, finish_reason=response["stopReason"])
@@ -137,8 +138,8 @@ class AwsConverter(BaseConverter):
             )
 
         usage = Usage(
-            input_tokens=response.get("usage", {}).get("promptTokens", 0),
-            output_tokens=response.get("usage", {}).get("completionTokens", 0),
+            input_tokens=response.get("usage", {}).get("inputTokens", 0),
+            output_tokens=response.get("usage", {}).get("outputTokens", 0),
             total_tokens=response.get("usage", {}).get("totalTokens", 0),
         )
 
