@@ -2,7 +2,7 @@
 AWS API 转换器实现。
 """
 
-from typing import Any, List, Dict, Tuple, Union
+from typing import Any, Generator, List, Dict, Tuple, Union
 from ...schema.ml_request import (
     SystemMessage,
     UserMessage,
@@ -98,7 +98,6 @@ class AwsConverter(BaseConverter):
     @staticmethod
     def normalize_response(response):
         """将AWS响应标准化为MLong的响应格式。"""
-        print("response", response)
         output = response.get("output")
         content = Content(text=None)
         # message = Message(content=content, finish_reason=response["stopReason"])
@@ -149,7 +148,9 @@ class AwsConverter(BaseConverter):
         return mlong_response
 
     @staticmethod
-    def normalize_stream_response(response_stream):
+    def normalize_stream_response(
+        response_stream,
+    ) -> Generator:
         """将AWS流式响应标准化为MLong的响应格式。"""
         # 返回生成器
         for chunk in response_stream.get("stream", []):
@@ -158,17 +159,33 @@ class AwsConverter(BaseConverter):
             start = None
             finish = None
             usage = None
+            # for debug
+            # print(chunk)
             # 处理不同类型的消息
             match chunk:
                 case {"contentBlockDelta": block}:
                     # 处理文本内容
-                    delta.text_content = block.get("delta").get("text")
-                case {"reasoningContent": _}:
-                    AwsConverter.reasoning = True
+                    if block.get("delta").get("text") is not None:
+                        delta.text = block.get("delta").get("text")
+                    # 处理推理内容
+                    if block.get("delta").get("reasoningContent") is not None:
+                        delta.reasoning = (
+                            block.get("delta").get("reasoningContent").get("text")
+                        )
+                    # # 处理工具调用
+                    # if block.get("delta").get("toolResult") is not None:
+                    #     delta.tool_result = block.get("delta").get("toolResult")
+                    #     delta.tool_result.tool_use_id = (
+                    #         block.get("delta").get("toolResult").get("toolUseId")
+                    #     )
                 case {"messageStart": message_start}:
                     # 处理推理内容
                     start = message_start.get("role")
                     pass
+                case {"contentBlockStop": content_stop}:
+                    # 处理内容块停止
+                    content_stop_index = content_stop.get("contentBlockIndex")
+                    finish = f"{content_stop_index}"
                 case {"messageStop": message_stop}:
                     if message_stop.get("stopReason") == "end_turn":
                         finish = "end_turn"

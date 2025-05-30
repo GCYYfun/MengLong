@@ -7,10 +7,12 @@ from .base_converter import BaseConverter
 from .poe_converter import PoeConverter
 from .deepseek_converter import DeepseekConverter
 from .openai_converter import OpenAIConverter
+from .infinigence_converter import InfinigenceConverter
 
 __all__ = [
     "BaseConverter",
     "PoeConverter",
     "DeepseekConverter",
     "OpenAIConverter",
+    "InfinigenceConverter",
 ]

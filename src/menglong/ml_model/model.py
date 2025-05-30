@@ -1,6 +1,7 @@
 from typing import Dict, Any, Optional, List
 from .provider import ProviderFactory
 from .utils import load_config, MODEL_REGISTRY
+from ..utils.log import rich_print_json
 
 
 class Model:
@@ -21,9 +22,7 @@ class Model:
 
         # 加载配置文件
         provider_config = load_config()
-        print("=====加载配置文件=====")
-        print(provider_config)
-        print("====================")
+        rich_print_json(provider_config, title="配置文件内容")
 
         # 检查配置文件中是否含有default键
         if "default" in provider_config:

@@ -32,4 +32,20 @@ MODEL_REGISTRY: Dict[str, Tuple[str, str]] = {
         "poe",
         "Claude-3.7-Sonnet",
     ),
+    "us.meta.llama4-scout-17b-instruct-v1:0": (
+        "aws",
+        "us.meta.llama4-scout-17b-instruct-v1:0",
+    ),
+    "us.anthropic.claude-sonnet-4-20250514-v1:0": (
+        "aws",
+        "us.anthropic.claude-sonnet-4-20250514-v1:0",
+    ),
+    "us.anthropic.claude-opus-4-20250514-v1:0": (
+        "aws",
+        "us.anthropic.claude-opus-4-20250514-v1:0",
+    ),
+    "deepseek-r1": (
+        "infinigence",
+        "deepseek-r1",
+    ),
 }

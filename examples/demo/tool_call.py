@@ -8,6 +8,15 @@ This demo shows how to use tool calls with both OpenAI and DeepSeek models in th
 from typing import List, Dict, Any, Optional
 import json
 from menglong.ml_model import Model
+from menglong.utils.log.logging_tool import (
+    print,
+    print_rule,
+    print_json,
+    print_table,
+    MessageType,
+    configure_logger,
+    get_logger,
+)
 
 # from menglong.ml_model.utils import user, assistant, system, tool, tool_res
 from menglong.ml_model.schema.ml_request import (
@@ -37,7 +46,7 @@ def get_weather(location: str, unit: str = "celsius") -> Dict[str, Any]:
         "forecast": ["sunny", "windy"],
         "humidity": 60,
     }
-    print(f"Weather tool called for {location} in {unit}")
+    print(f"Weather tool called for {location} in {unit}", MessageType.INFO)
     return weather_data
 
 
@@ -130,15 +139,18 @@ def openai_tool_call_demo():
         tool_choice="auto",
     )
 
-    print("Response from model:")
-    print(response)
+    print_rule("Response from model", style="green")
+    print_json(response)
 
     # Check if there are tool calls in the response
     if hasattr(response.message, "tool_desc") and response.message.tool_desc:
-        print("Model requested to use a tool:")
+        print("Model requested to use a tool:", MessageType.SUCCESS, title="Tool Call")
         for tool_call in response.message.tool_desc:
-            print(f"Tool: {tool_call.name}")
-            print(f"Arguments: {tool_call.arguments}")
+            print_table(
+                [["Name", tool_call.name], ["Arguments", tool_call.arguments]],
+                ["Property", "Value"],
+                title="Tool Details",
+            )
 
             # Parse the arguments and call the appropriate function
             if tool_call.name == "get_weather":
@@ -158,18 +170,18 @@ def openai_tool_call_demo():
 
         # Get the final response from the model
         final_response = model.chat(messages=messages, model_id="gpt-4o")
-        print("Final Response:")
-        print(final_response.message.content)
+        print_rule("Final Response", style="cyan")
+        print(final_response.message.content, MessageType.AGENT, use_panel=True)
         # print("Tool response:", final_response.message.tool_calls[0].content)
     # Check if there are tool calls in the response
     else:
-        print("No tool calls were made.")
-        print("Response:", response.message.content.text)
+        print("No tool calls were made.", MessageType.WARNING)
+        print(response.message.content.text, MessageType.AGENT, use_panel=True)
 
 
 def deepseek_tool_call_demo():
     """Demo of tool calls using DeepSeek models"""
-    print("\n=== DeepSeek Tool Call Demo ===\n")
+    print_rule("DeepSeek Tool Call Demo", style="blue")
 
     model = Model(model_id="deepseek-chat")
 
@@ -190,11 +202,14 @@ def deepseek_tool_call_demo():
 
     # Check if there are tool calls in the response
     if hasattr(response.message, "tool_desc") and response.message.tool_desc:
-        print("Model requested to use a tool:")
+        print("Model requested to use a tool:", MessageType.SUCCESS, title="Tool Call")
         for tool_call in response.message.tool_desc:
-            print(tool_call)
-            print(f"Tool: {tool_call.name}")
-            print(f"Arguments: {tool_call.arguments}")
+            print_json(tool_call, title="Tool Call Object")
+            print_table(
+                [["Name", tool_call.name], ["Arguments", tool_call.arguments]],
+                ["Property", "Value"],
+                title="Tool Details",
+            )
 
             # Parse the arguments and call the appropriate function
             if tool_call.name == "get_weather":
@@ -209,14 +224,14 @@ def deepseek_tool_call_demo():
                     tool(tool_id=tool_call.id, content=json.dumps(weather_result))
                 )
 
-        print("step2")
+        print("Processing tool response...", MessageType.INFO)
         # Get the final response from the model
         final_response = model.chat(messages=messages, model_id="deepseek-chat")
-        print("\nFinal Response:")
-        print(final_response.message.content)
+        print_rule("Final Response", style="cyan")
+        print(final_response.message.content, MessageType.AGENT, use_panel=True)
     else:
-        print("No tool calls were made.")
-        print("Response:", response.message.content)
+        print("No tool calls were made.", MessageType.WARNING)
+        print(response.message.content, MessageType.AGENT, use_panel=True)
 
 
 def anthropic_tool_call_demo():
@@ -279,25 +294,27 @@ def anthropic_tool_call_demo():
 
 
 def main():
+    # 配置日志
+    configure_logger(log_file="tool_call_demo.log")
+    logger = get_logger()
 
-    print("Starting Tool Call Demo...")
+    logger.info("启动工具调用演示")
+    print("Starting Tool Call Demo...", MessageType.INFO)
 
-    print("OpenAI")
-    print("=====================================")
+    print_rule("OpenAI Demo", style="green")
+    logger.info("开始 OpenAI 工具调用演示")
     openai_tool_call_demo()
-    print("=====================================")
 
-    print("DeepSeek")
-    print("=====================================")
+    print_rule("DeepSeek Demo", style="blue")
+    logger.info("开始 DeepSeek 工具调用演示")
     deepseek_tool_call_demo()
-    print("=====================================")
 
-    print("Anthropic")
-    print("=====================================")
+    print_rule("Anthropic Demo", style="magenta")
+    logger.info("开始 Anthropic 工具调用演示")
     anthropic_tool_call_demo()
-    print("=====================================")
 
-    print("Tool Call Demo completed.")
+    logger.info("工具调用演示完成")
+    print("Tool Call Demo completed.", MessageType.SUCCESS, title="Completed")
 
 
 if __name__ == "__main__":

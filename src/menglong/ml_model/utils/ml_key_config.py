@@ -1,9 +1,10 @@
 import tomllib as toml
 
-# import yaml
+import yaml
 import os
 from typing import Any, Dict
 from pathlib import Path
+from ...utils.log import rich_print, RichMessageType
 
 
 def load_config(config_path: str = ".configs.toml") -> Dict[str, Any]:
@@ -35,7 +36,7 @@ def load_config(config_path: str = ".configs.toml") -> Dict[str, Any]:
 
         config_path = project_root / config_path
 
-    print(f"尝试加载配置文件: {config_path}")
+    rich_print(f"{config_path}", RichMessageType.INFO, title="尝试加载配置文件")
 
     if config_path.exists():
         try:
@@ -47,10 +48,10 @@ def load_config(config_path: str = ".configs.toml") -> Dict[str, Any]:
             with open(config_path, "rb") as f:
                 return toml.load(f)
         except Exception as e:
-            print(f"加载配置文件失败: {e}")
+            rich_print(f"加载配置文件失败: {e}", RichMessageType.ERROR)
             return {}
     else:
-        print(f"配置文件不存在: {config_path}")
+        rich_print(f"配置文件不存在: {config_path}", RichMessageType.WARNING)
         return {}
 
 

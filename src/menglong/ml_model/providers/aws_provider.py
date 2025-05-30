@@ -45,7 +45,7 @@ class AwsProvider(Provider):
         ]
         self.converter = AwsConverter()
 
-    def is_reasoning(self, model_id, **kwargs):
+    def is_reasoning(self, model_id, kwargs):
         """检查给定模型是否支持推理模式"""
         if (
             "claude" in model_id
@@ -87,7 +87,7 @@ class AwsProvider(Provider):
         stream_mode = kwargs.get("stream", False)
 
         # 设置是否使用推理模式
-        AwsConverter.reasoning = self.is_reasoning(model_id)
+        AwsConverter.reasoning = self.is_reasoning(model_id, kwargs)
 
         call_param = {
             "modelId": model_id,
