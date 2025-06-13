@@ -30,8 +30,23 @@ class ATAConversation:
         self.context_manager.topic.system = self.active_topic
 
     def add_topic_to_context(self):  # TODO specific topic
-        self.active_topic = self.topic.substitute()
-        self.passive_topic = self.topic.substitute()
+        # 检测 tempalte 是否有变量
+        if not isinstance(self.topic, Template):
+            raise ValueError("Topic must be a Template object.")
+        variables = self.topic.get_identifiers()
+        print("模板中的变量:", variables)
+
+        # 准备替换的变量值
+        active_data = self.active.role_var.copy()
+        passive_data = self.passive.role_var.copy()
+
+        # 检查模板中的变量是否都已提供值
+        if all(var in active_data for var in variables):
+            # 替换变量
+            self.active_topic = self.topic.safe_substitute(active_data)
+        if all(var in passive_data for var in variables):
+            # 替换变量
+            self.passive_topic = self.topic.safe_substitute(passive_data)
 
         self.passive.update_system_prompt({"topic": f"{self.passive_topic}"})
 
