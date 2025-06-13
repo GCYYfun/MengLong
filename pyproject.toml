@@ -17,6 +17,7 @@ classifiers = [
 
 dependencies = [
     "boto3>=1.38.0",
+    "duckduckgo-search>=8.0.3",
     "fastapi-poe>=0.0.60",
     "httpx[socks]>=0.28.1",
     "openai>=1.75.0",

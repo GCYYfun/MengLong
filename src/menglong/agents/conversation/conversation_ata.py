@@ -24,20 +24,14 @@ class ATAConversation:
         self.active_end = False
         self.passive_end = False
 
+        self.end_identify = "END"  # 结束标识
+
         self.context_manager = ATAContextManager()
         self.context_manager.topic.system = self.active_topic
 
     def add_topic_to_context(self):  # TODO specific topic
-        self.active_topic = self.topic.substitute(
-            name=self.active.role_info["name"],
-            peer_name=self.passive.role_info["name"],
-            peer_info=self.passive.role_info,
-        )
-        self.passive_topic = self.topic.substitute(
-            name=self.passive.role_info["name"],
-            peer_name=self.active.role_info["name"],
-            peer_info=self.active.role_info,
-        )
+        self.active_topic = self.topic.substitute()
+        self.passive_topic = self.topic.substitute()
 
         self.passive.update_system_prompt({"topic": f"{self.passive_topic}"})
 
@@ -60,12 +54,16 @@ class ATAConversation:
             ):
                 active_res = self.active.chat(self.active_topic)
                 # print(f"[system]\n\n{self.active.context_manager.system}")
-                print(f"{self.active.role_info['name']}: \n{active_res}")
+                print(f"-------------------------")
+                print(f"{self.active.role_var['name']}: \n{active_res}")
+                print(f"-------------------------")
                 # print()
             else:
                 active_res = self.active.chat(passive_res)
                 # print(f"[system]\n\n{self.active.context_manager.system}")
-                print(f"{self.active.role_info['name']}: \n{active_res}")
+                print(f"-------------------------")
+                print(f"{self.active.role_var['name']}: \n{active_res}")
+                print(f"------------------------")
                 # print()
 
             self.context_manager.topic.add_user_message(active_res)
@@ -75,7 +73,9 @@ class ATAConversation:
 
             passive_res = self.passive.chat(active_res)
             # print(f"[system]\n\n{self.passive.context_manager.system}")
-            print(f"{self.passive.role_info['name']}:  \n{passive_res}")
+            print(f"-------------------------")
+            print(f"{self.passive.role_var['name']}:  \n{passive_res}")
+            print(f"-------------------------")
             # print()
             self.context_manager.topic.add_assistant_response(passive_res)
 
@@ -85,7 +85,7 @@ class ATAConversation:
         self.context_manager.active = self.active.context_manager
         self.context_manager.passive = self.passive.context_manager
         messages = self.replace_role_name(
-            messages, self.active.role_info["name"], self.passive.role_info["name"]
+            messages, self.active.role_var["name"], self.passive.role_var["name"]
         )
 
         return messages
@@ -155,20 +155,24 @@ class ATAConversation:
     def replace_role_name(self, messages, user, assistant):
         role_play_messages = messages
         for message in role_play_messages:
-            if message["role"] == "user":
-                message["role"] = user
-            elif message["role"] == "assistant":
-                message["role"] = assistant
+            if message.role == "user":
+                message.role = user
+            elif message.role == "assistant":
+                message.role = assistant
             else:
-                message["role"] = "background"
+                message.role = "background"
         return role_play_messages
+
+    def set_end_identify(self, identifier: str = "END"):
+        """结束标识"""
+        self.end_identify = identifier
 
     def is_over(self, a_res: str = None, p_res: str = None):
         if a_res is not None:
-            if not self.active_end and "[END]" in a_res:
+            if not self.active_end and self.end_identify in a_res:
                 self.active_end = True
         if p_res is not None:
-            if not self.passive_end and "[END]" in p_res:
+            if not self.passive_end and self.end_identify in p_res:
                 self.passive_end = True
         if self.active_end and self.passive_end:
             self.active_end = False

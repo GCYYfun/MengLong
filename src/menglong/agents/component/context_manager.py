@@ -1,5 +1,20 @@
+from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from ...ml_model.schema import user, assistant, system
+
+
+@dataclass
+class MessagesContext:
+    """对话消息上下文"""
+
+    context: List[Dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass
+class ReasoningCache:
+    """推理内容数据结构"""
+
+    context: List[Dict[str, Any]] = field(default_factory=list)
 
 
 class ContextManager:
@@ -7,38 +22,45 @@ class ContextManager:
 
     def __init__(self):
         """初始化上下文管理器"""
-        self.context: List[Dict[str, Any]] = []
+        self._messages = MessagesContext()
+        self._reasoning = ReasoningCache()
+        self.tokens = 0
+        self.total_price = 0.0
 
     def reset(self):
         """重置对话上下文"""
-        self.context = []
+        self._messages.context = []
+        self._reasoning.context = []
 
     def clear(self):
         """清除对话上下文，但保留系统消息"""
-        if len(self.context) != 0 and self.context[0].role == "system":
-            self.context = self.context[:1]
+        if (
+            len(self._messages.context) != 0
+            and self._messages.context[0].role == "system"
+        ):
+            self._messages.context = self._messages.context[:1]
 
     @property
     def system(self) -> Optional[str]:
         """获取系统消息内容"""
-        if len(self.context) != 0:
-            if self.context[0].role == "system":
-                return self.context[0].content
+        if len(self._messages.context) != 0:
+            if self._messages.context[0].role == "system":
+                return self._messages.context[0].content
         return None
 
     @property
     def messages(self) -> List[Dict[str, Any]]:
         """获取当前对话上下文"""
-        return self.context
+        return self._messages.context
 
     @system.setter
     def system(self, message: str):
         """设置系统消息"""
-        if len(self.context) != 0:
-            if self.context[0].role == "system":
-                self.context[0].content = message
+        if len(self._messages.context) != 0:
+            if self._messages.context[0].role == "system":
+                self._messages.context[0].content = message
         else:
-            self.context.append(system(content=message))
+            self._messages.context.append(system(content=message))
 
     def add_user_message(self, message: str):
         """添加用户消息
@@ -50,16 +72,19 @@ class ContextManager:
             ValueError: 如果用户消息不符合对话规则
         """
         # 检查是否有连续的用户消息
-        if len(self.context) == 0:
-            self.context.append(user(content=message))
-        elif self.context[-1].role == "assistant" or self.context[-1].role == "system":
-            self.context.append(user(content=message))
+        if len(self._messages.context) == 0:
+            self._messages.context.append(user(content=message))
+        elif (
+            self._messages.context[-1].role == "assistant"
+            or self._messages.context[-1].role == "system"
+        ):
+            self._messages.context.append(user(content=message))
         else:
             raise ValueError(
-                f"User message must follow system or assistant message,now you context is {self.context},message is {message}"
+                f"User message must follow system or assistant message,now you context is {self._messages.context},message is {message}"
             )
 
-    def add_assistant_response(self, message: str):
+    def add_assistant_response(self, message: str, reasoning: Optional[str] = None):
         """添加助手响应
 
         Args:
@@ -68,16 +93,33 @@ class ContextManager:
         Raises:
             ValueError: 如果助手响应不符合对话规则
         """
-        if self.context and self.context[-1].role == "user":
-            self.context.append(assistant(content=message))
+        if self._messages.context and self._messages.context[-1].role == "user":
+            self._messages.context.append(assistant(content=message))
         else:
             raise ValueError("Assistant response must follow user message")
 
+    def add_assistant_reasoning(self, query: str, reasoning: str, answers: str):
+        """添加助手推理消息
+
+        Args:
+            query: 用户查询内容
+            reasoning: 助手推理内容
+
+        Raises:
+            ValueError: 如果助手推理不符合对话规则
+        """
+        if self._reasoning.context:
+            self._reasoning.context.append(
+                {"query": query, "reasoning": reasoning, "answers": answers}
+            )
+        else:
+            raise ValueError("Assistant reasoning must follow assistant response")
+
     def pop(self) -> Dict[str, Any]:
         """移除并返回最后一条消息"""
-        if not self.context:
+        if not self._messages.context:
             raise IndexError("pop from empty context")
-        return self.context.pop()
+        return self._messages.context.pop()
 
 
 class ATAContextManager:
