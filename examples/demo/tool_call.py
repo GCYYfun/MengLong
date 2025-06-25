@@ -8,13 +8,13 @@ This demo shows how to use tool calls with both OpenAI and DeepSeek models in th
 from typing import List, Dict, Any, Optional
 import json
 from menglong.ml_model import Model
-from menglong.utils.log.logging_tool import (
-    print,
+from menglong.utils.log import (
+    print_message,
     print_rule,
     print_json,
     print_table,
     MessageType,
-    configure_logger,
+    configure,
     get_logger,
 )
 
@@ -26,8 +26,11 @@ from menglong.ml_model.schema.ml_request import (
     UserMessage as user,
 )
 
+from menglong.agents.component.tool_manager import tool as Tool
+
 
 # Define a simple weather tool
+@Tool
 def get_weather(location: str, unit: str = "celsius") -> Dict[str, Any]:
     """Get the current weather in a given location.
 
@@ -46,7 +49,7 @@ def get_weather(location: str, unit: str = "celsius") -> Dict[str, Any]:
         "forecast": ["sunny", "windy"],
         "humidity": 60,
     }
-    print(f"Weather tool called for {location} in {unit}", MessageType.INFO)
+    print_message(f"Weather tool called for {location} in {unit}", MessageType.INFO)
     return weather_data
 
 
@@ -140,15 +143,25 @@ def openai_tool_call_demo():
     )
 
     print_rule("Response from model", style="green")
-    print_json(response)
+    print_json(response.model_dump())
 
     # Check if there are tool calls in the response
-    if hasattr(response.message, "tool_desc") and response.message.tool_desc:
-        print("Model requested to use a tool:", MessageType.SUCCESS, title="Tool Call")
-        for tool_call in response.message.tool_desc:
+    if (
+        hasattr(response.message, "tool_descriptions")
+        and response.message.tool_descriptions
+    ):
+        print_message(
+            "Model requested to use a tool:", MessageType.SUCCESS, title="Tool Call"
+        )
+        for tool_call in response.message.tool_descriptions:
             print_table(
-                [["Name", tool_call.name], ["Arguments", tool_call.arguments]],
-                ["Property", "Value"],
+                [
+                    {
+                        "Name": tool_call.name,
+                        "Arguments": tool_call.arguments,
+                    }
+                ],
+                headers=["Name", "Arguments"],
                 title="Tool Details",
             )
 
@@ -158,7 +171,7 @@ def openai_tool_call_demo():
                 weather_result = get_weather(**args)
 
                 # Add the tool response to messages
-                print(response.message)
+                print_json(response.message.model_dump(), title="Tool Call Response")
                 messages.append(response.message)
 
                 messages.append(
@@ -171,12 +184,14 @@ def openai_tool_call_demo():
         # Get the final response from the model
         final_response = model.chat(messages=messages, model_id="gpt-4o")
         print_rule("Final Response", style="cyan")
-        print(final_response.message.content, MessageType.AGENT, use_panel=True)
+        print_message(
+            final_response.message.content.text, MessageType.AGENT, panel=True
+        )
         # print("Tool response:", final_response.message.tool_calls[0].content)
     # Check if there are tool calls in the response
     else:
-        print("No tool calls were made.", MessageType.WARNING)
-        print(response.message.content.text, MessageType.AGENT, use_panel=True)
+        print_message("No tool calls were made.", MessageType.WARNING)
+        print_message(response.message.content.text, MessageType.AGENT, use_panel=True)
 
 
 def deepseek_tool_call_demo():
@@ -201,13 +216,19 @@ def deepseek_tool_call_demo():
     )
 
     # Check if there are tool calls in the response
-    if hasattr(response.message, "tool_desc") and response.message.tool_desc:
-        print("Model requested to use a tool:", MessageType.SUCCESS, title="Tool Call")
-        for tool_call in response.message.tool_desc:
-            print_json(tool_call, title="Tool Call Object")
+    # 检查是否有工具调用
+    if (
+        hasattr(response.message, "tool_descriptions")
+        and response.message.tool_descriptions
+    ):
+        print_message(
+            "Model requested to use a tool:", MessageType.SUCCESS, title="Tool Call"
+        )
+        for tool_call in response.message.tool_descriptions:
+            print_json(tool_call.model_dump(), title="Tool Call Object")
             print_table(
-                [["Name", tool_call.name], ["Arguments", tool_call.arguments]],
-                ["Property", "Value"],
+                [{"Name": tool_call.name, "Arguments": tool_call.arguments}],
+                headers=["Name", "Arguments"],
                 title="Tool Details",
             )
 
@@ -224,19 +245,81 @@ def deepseek_tool_call_demo():
                     tool(tool_id=tool_call.id, content=json.dumps(weather_result))
                 )
 
-        print("Processing tool response...", MessageType.INFO)
+        print_message("Processing tool response...", MessageType.INFO)
         # Get the final response from the model
         final_response = model.chat(messages=messages, model_id="deepseek-chat")
         print_rule("Final Response", style="cyan")
-        print(final_response.message.content, MessageType.AGENT, use_panel=True)
+        print_message(
+            final_response.message.content.text, MessageType.AGENT, panel=True
+        )
     else:
-        print("No tool calls were made.", MessageType.WARNING)
-        print(response.message.content, MessageType.AGENT, use_panel=True)
+        print_message("No tool calls were made.", MessageType.WARNING)
+        print_message(response.message.content.text, MessageType.AGENT, panel=True)
 
 
-def anthropic_tool_call_demo():
+def infinigence_tool_call_demo():
+    print_message("\n=== Infinigence Tool Call Demo ===\n")
+
+    model = Model(model_id="claude-3-7-sonnet-20250219")
+
+    # System message that instructs the model to use tools
+    messages = [
+        system(
+            content="You are a helpful assistant that can use tools to answer user questions."
+        ),
+        user(content="What's the weather like in Tokyo?"),
+    ]
+    # Call the model with tool definitions
+    response = model.chat(
+        messages=messages,
+        temperature=0.5,
+        maxTokens=1000,
+        tools=[get_weather],
+        # tool_choice="required",
+        debug=True,
+        # tools=[weather_tool_an],
+        # tool_choice={"type": "any"},
+    )
+    print_message("Response from model:")
+    print_json(response.model_dump(), title="Model Tool Response")
+    # Check if there are tool calls in the response
+    if (
+        hasattr(response.message, "tool_descriptions")
+        and response.message.tool_descriptions
+    ):
+        print_message("Model requested to use a tool:")
+        for tool_desc in response.message.tool_descriptions:
+            print_message(f"Tool: {tool_desc.name}")
+            print_message(f"Arguments: {tool_desc.arguments}")
+
+            print_message(f"Arguments Type: {type(tool_desc.arguments)}")
+
+            # Parse the arguments and call the appropriate function
+            if tool_desc.name == "get_weather":
+                args = json.loads(tool_desc.arguments)
+                weather_result = get_weather(**args)
+
+                # Add the tool response to messages
+                messages.append(response.message)
+
+                messages.append(
+                    tool(
+                        tool_id=tool_desc.id,
+                        content=json.dumps(weather_result),
+                    )
+                )
+
+        print_message("step2")
+        print_message(messages, title="Messages after tool call")
+        # Get the final response from the model
+        final_response = model.chat(messages=messages, tools=[get_weather])
+        print_message("Final Response:")
+        print_message(final_response.message.content.text)
+
+
+def aws_anthropic_tool_call_demo():
     """Demo of tool calls using Anthropic models"""
-    print("\n=== Anthropic Tool Call Demo ===\n")
+    print_message("\n=== AWS Tool Call Demo ===\n")
 
     model = Model(model_id="us.anthropic.claude-3-7-sonnet-20250219-v1:0")
 
@@ -257,15 +340,20 @@ def anthropic_tool_call_demo():
         tool_choice={"type": "any"},
     )
 
-    print("Response from model:")
-    print(response)
+    print_message("Response from model:")
+    print_json(response.model_dump(), title="Model Tool Response")
 
     # Check if there are tool calls in the response
-    if hasattr(response.message, "tool_desc") and response.message.tool_desc:
-        print("Model requested to use a tool:")
-        for tool_desc in response.message.tool_desc:
-            print(f"Tool: {tool_desc.name}")
-            print(f"Arguments: {tool_desc.arguments}")
+    if (
+        hasattr(response.message, "tool_descriptions")
+        and response.message.tool_descriptions
+    ):
+        print_message("Model requested to use a tool:")
+        for tool_desc in response.message.tool_descriptions:
+            print_message(f"Tool: {tool_desc.name}")
+            print_message(f"Arguments: {tool_desc.arguments}")
+
+            print_message(f"Arguments Type: {type(tool_desc.arguments)}")
 
             # Parse the arguments and call the appropriate function
             if tool_desc.name == "get_weather":
@@ -276,45 +364,48 @@ def anthropic_tool_call_demo():
                 messages.append(response.message)
 
                 messages.append(
-                    user(
+                    tool(
                         tool_id=tool_desc.id,
-                        content=weather_result,
+                        content=str(weather_result),
                     )
                 )
 
-        print("step2")
-        print("messages", messages)
+        print_message("step2")
+        print_message(messages, title="Messages after tool call")
         # Get the final response from the model
         final_response = model.chat(messages=messages, tools=[weather_tool_aws])
-        print("Final Response:")
-        print(final_response.message.content)
+        print_message("Final Response:")
+        print_message(final_response.message.content.text)
     else:
-        print("No tool calls were made.")
-        print("Response:", response.message.content)
+        print_message("No tool calls were made.")
+        print_message("Response:", response.message.content.text)
 
 
 def main():
     # 配置日志
-    configure_logger(log_file="tool_call_demo.log")
+    configure(log_file="tool_call_demo.log")
     logger = get_logger()
 
     logger.info("启动工具调用演示")
-    print("Starting Tool Call Demo...", MessageType.INFO)
+    print_message("Starting Tool Call Demo...", MessageType.INFO)
 
-    print_rule("OpenAI Demo", style="green")
-    logger.info("开始 OpenAI 工具调用演示")
-    openai_tool_call_demo()
+    # print_rule("OpenAI Demo", style="green")
+    # logger.info("开始 OpenAI 工具调用演示")
+    # openai_tool_call_demo()
 
-    print_rule("DeepSeek Demo", style="blue")
-    logger.info("开始 DeepSeek 工具调用演示")
-    deepseek_tool_call_demo()
+    # print_rule("DeepSeek Demo", style="blue")
+    # logger.info("开始 DeepSeek 工具调用演示")
+    # deepseek_tool_call_demo()
 
-    print_rule("Anthropic Demo", style="magenta")
-    logger.info("开始 Anthropic 工具调用演示")
-    anthropic_tool_call_demo()
+    # print_rule("AWS Demo", style="magenta")
+    # logger.info("开始 AWS 工具调用演示")
+    # aws_anthropic_tool_call_demo()
+
+    logger.info("开始 Infinigence 工具调用演示")
+    infinigence_tool_call_demo()
 
     logger.info("工具调用演示完成")
-    print("Tool Call Demo completed.", MessageType.SUCCESS, title="Completed")
+    print_message("Tool Call Demo completed.", MessageType.SUCCESS, title="Completed")
 
 
 if __name__ == "__main__":

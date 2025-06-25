@@ -52,4 +52,21 @@ MODEL_REGISTRY: Dict[str, Tuple[str, str]] = {
         "infinigence",
         "claude-3-7-sonnet-20250219",
     ),
+    "claude-4-sonnet-20250514": (
+        "infinigence",
+        "claude-4-sonnet-20250514",
+    ),
+}
+
+MODEL_PRICES: Dict[str, float] = {
+    "gpt-4o": {
+        "input": 0.0003,
+        "cache_input": 0.0003,
+        "output": 0.0006,
+    },
+    "claude-3-5-sonnet-20241022": {
+        "input": 0.00025,
+        "cache_input": 0.00025,
+        "output": 0.0005,
+    },
 }

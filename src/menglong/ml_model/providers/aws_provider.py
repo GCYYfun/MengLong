@@ -1,6 +1,9 @@
+import time
 import boto3
 import json
 from typing import Union
+
+from menglong.utils.log import print_json
 from ..provider import Provider
 from ..schema.ml_response import (
     ChatResponse,
@@ -80,11 +83,12 @@ class AwsProvider(Provider):
             if key in self.inference_parameters:
                 inference_config[key] = value
             elif key == "tools":
-                tool_config[key] = value
+                tool_config[key] = self.converter.convert_tools(value, model_id)
             else:
                 additional_model_request_fields[key] = value
 
         stream_mode = kwargs.get("stream", False)
+        debug = kwargs.get("debug", False)
 
         # 设置是否使用推理模式
         AwsConverter.reasoning = self.is_reasoning(model_id, kwargs)
@@ -102,10 +106,10 @@ class AwsProvider(Provider):
         # 如果是流式模式，调用流式处理
         if stream_mode:
             response = self.client.converse_stream(**call_param)
-            return self.converter.normalize_stream_response(response)
+            return self.converter.normalize_stream_response(response, debug=debug)
         else:
             response = self.client.converse(**call_param)
-            return self.converter.normalize_response(response)
+            return self.converter.normalize_response(response, debug=debug)
 
     def embed(self, model_id: str, texts: [], **kwargs) -> EmbedResponse:
         """执行嵌入向量计算

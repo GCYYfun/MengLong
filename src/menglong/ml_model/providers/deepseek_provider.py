@@ -39,6 +39,9 @@ class DeepseekProvider(Provider):
         DeepseekConverter.reasoning = self.is_reasoning(model_id)
 
         messages = self.converter.convert_request(messages)
+
+        if kwargs.get("tools"):
+            kwargs["tools"] = self.converter.convert_tools(kwargs["tools"], model_id)
         # 如果stream为True，则返回流式响应
         if kwargs.get("stream", False):
             return self.chat_stream(model_id, messages, **kwargs)

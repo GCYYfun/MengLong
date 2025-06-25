@@ -2,6 +2,7 @@
 Deepseek API 转换器实现。
 """
 
+from typing import Dict, List
 from ...schema.ml_request import (
     SystemMessage,
     UserMessage,
@@ -20,6 +21,8 @@ from ...schema.ml_response import (
 )
 from .base_converter import BaseConverter
 
+from ....utils.log import print_json
+
 
 class InfinigenceConverter(BaseConverter):
     """
@@ -29,10 +32,16 @@ class InfinigenceConverter(BaseConverter):
     reasoning = False
 
     @staticmethod
-    def convert_request(messages):
+    def convert_request(messages, debug=True):
         """将消息转换为OpenAI兼容格式。"""
+
         format_messages = []
         for message in messages:
+            if debug:
+                print_json(
+                    message.model_dump(),
+                    title="Infinigence request",
+                )
             if isinstance(message, SystemMessage):
                 format_messages.append(
                     {"role": message.role, "content": message.content}
@@ -51,8 +60,8 @@ class InfinigenceConverter(BaseConverter):
             elif isinstance(message, Message):
                 # 处理助手消息的列表内容
                 content = []
-                if message.tool_desc is not None:
-                    for item in message.tool_desc:
+                if message.tool_descriptions is not None:
+                    for item in message.tool_descriptions:
                         content.append(
                             {
                                 "id": item.id,
@@ -71,6 +80,10 @@ class InfinigenceConverter(BaseConverter):
                     }
                 )
             elif isinstance(message, ToolMessage):
+                print_json(
+                    message.model_dump(),
+                    title="ToolMessage",
+                )
                 format_messages.append(
                     {
                         "role": message.role,
@@ -83,8 +96,13 @@ class InfinigenceConverter(BaseConverter):
         return format_messages
 
     @staticmethod
-    def normalize_response(response):
+    def normalize_response(response, debug=False):
         """将Infinigence响应标准化为MLong的响应格式。"""
+        if debug:
+            print_json(
+                response,
+                title="Infinigence response",
+            )
         content = Content(text="")
         response_choices = response["choices"][0]
 
@@ -112,7 +130,7 @@ class InfinigenceConverter(BaseConverter):
                     arguments=tool_call["function"]["arguments"],
                 )
                 tool_calls_list.append(tc)
-            message.tool_desc = tool_calls_list
+            message.tool_descriptions = tool_calls_list
         usage = Usage(
             input_tokens=response["usage"]["prompt_tokens"],
             output_tokens=response["usage"]["completion_tokens"],
@@ -189,3 +207,24 @@ class InfinigenceConverter(BaseConverter):
                 stream_response = ChatStreamResponse(message=message)
 
             yield stream_response
+
+    @staticmethod
+    def convert_tools(tools: List, model_id: str = None) -> List[Dict]:
+        """将工具转换为适合模型的格式。"""
+        if not tools:
+            return []
+
+        formatted_tools = []
+        for tool in tools:
+            tool_info = tool._tool_info
+            formatted_tool = {
+                "type": "function",
+                "function": {
+                    "name": tool_info.name,
+                    "description": tool_info.description,
+                    "parameters": tool_info.parameters,
+                },
+            }
+            formatted_tools.append(formatted_tool)
+
+        return formatted_tools

@@ -1,7 +1,7 @@
 from typing import Dict, Any, Optional, List
 from .provider import ProviderFactory
 from .utils import load_config, MODEL_REGISTRY
-from ..utils.log import rich_print_json
+from ..utils.log import print_json
 
 
 class Model:
@@ -22,7 +22,7 @@ class Model:
 
         # 加载配置文件
         provider_config = load_config()
-        rich_print_json(provider_config, title="配置文件内容")
+        print_json(provider_config, title="配置文件内容")
 
         # 检查配置文件中是否含有default键
         if "default" in provider_config:
@@ -33,6 +33,8 @@ class Model:
         else:
             self.model_id = model_id
             self._embed_model_id = None
+
+        self.provider, _ = MODEL_REGISTRY[self.model_id]
 
         # 合并配置
         self.provider_config = provider_config
@@ -132,7 +134,8 @@ class Model:
 
         # 获取提供商和模型
         provider, model = MODEL_REGISTRY[model_id]
-
+        # 根据 model id 获取提供商
+        self.provider = provider
         # 获取提供商实例
         model_client = self.get_or_create_client(provider)
         if not model_client:
@@ -166,6 +169,7 @@ class Model:
             raise ValueError(f"Model {model_id} is not supported")
 
         provider, model = MODEL_REGISTRY[model_id]
+        self.provider = provider
 
         model_client = self.get_or_create_client(provider)
         if not model_client:

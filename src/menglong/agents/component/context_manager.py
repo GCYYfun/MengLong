@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
-from ...ml_model.schema import user, assistant, system
+from ...ml_model.schema import user, assistant, system, tool, res_message
 
 
 @dataclass
@@ -34,9 +34,8 @@ class ContextManager:
 
     def clear(self):
         """清除对话上下文，但保留系统消息"""
-        if (
-            len(self._messages.context) != 0
-            and self._messages.context[0].role == "system"
+        if len(self._messages.context) != 0 and isinstance(
+            self._messages.context[0], system
         ):
             self._messages.context = self._messages.context[:1]
 
@@ -44,7 +43,7 @@ class ContextManager:
     def system(self) -> Optional[str]:
         """获取系统消息内容"""
         if len(self._messages.context) != 0:
-            if self._messages.context[0].role == "system":
+            if isinstance(self._messages.context[0], system):
                 return self._messages.context[0].content
         return None
 
@@ -57,7 +56,7 @@ class ContextManager:
     def system(self, message: str):
         """设置系统消息"""
         if len(self._messages.context) != 0:
-            if self._messages.context[0].role == "system":
+            if isinstance(self._messages.context[0], system):
                 self._messages.context[0].content = message
         else:
             self._messages.context.append(system(content=message))
@@ -75,8 +74,9 @@ class ContextManager:
         if len(self._messages.context) == 0:
             self._messages.context.append(user(content=message))
         elif (
-            self._messages.context[-1].role == "assistant"
-            or self._messages.context[-1].role == "system"
+            isinstance(self._messages.context[-1], assistant)
+            or isinstance(self._messages.context[-1], system)
+            or isinstance(self._messages.context[-1], res_message)
         ):
             self._messages.context.append(user(content=message))
         else:
@@ -93,7 +93,10 @@ class ContextManager:
         Raises:
             ValueError: 如果助手响应不符合对话规则
         """
-        if self._messages.context and self._messages.context[-1].role == "user":
+        if self._messages.context and (
+            isinstance(self._messages.context[-1], user)
+            or isinstance(self._messages.context[-1], tool)
+        ):
             self._messages.context.append(assistant(content=message))
         else:
             raise ValueError("Assistant response must follow user message")

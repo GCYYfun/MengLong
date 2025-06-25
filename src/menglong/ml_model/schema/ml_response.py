@@ -3,29 +3,38 @@ from pydantic import BaseModel, Field
 
 # ======== 基础模型 ========
 
+"""
+ChatResponse:
+    message: 
+        content: 
+            text: Optional[str]
+            reasoning: Optional[str]
+        tool_descriptions: 
+            [
+                {
+                    "id": "string",
+                    "type": "function",
+                    "name": "string",
+                    "arguments": {
+                        "location": "string",
+                        "unit": "string"
+                    }
+                }
+            ]
+        finish_reason: Optional[str]
+    model: Optional[str]
+    usage: 
+        input_tokens: int
+        output_tokens: int
+        total_tokens: int
+"""
+
 
 class Content(BaseModel):
     """消息内容模型"""
 
     text: Optional[str] = Field(default=None, description="生成的文本内容")
     reasoning: Optional[str] = Field(default=None, description="思考过程内容")
-
-
-# class Function(BaseModel):
-#     """函数调用模型"""
-
-#     name: str = Field(description="函数名称")
-#     arguments: str = Field(default=None, description="函数参数")  # 函数参数信息
-
-
-# class ToolDesc(BaseModel):
-#     """工具调用模型"""
-
-#     id: str = Field(description="工具调用ID")
-#     type: str = Field(description="工具调用类型")
-#     function: Optional[Function] = Field(
-#         default=None, description="函数调用信息"
-#     )  # 可能包含函数名称和参数等信息
 
 
 class ToolDesc(BaseModel):
@@ -43,7 +52,7 @@ class Message(BaseModel):
     """消息模型"""
 
     content: Content = Field(default=None, description="消息内容")
-    tool_desc: Optional[List[ToolDesc]] = Field(
+    tool_descriptions: Optional[List[ToolDesc]] = Field(
         default=None, description="工具调用列表"
     )
     finish_reason: Optional[str] = Field(default=None, description="结束原因")
@@ -66,6 +75,21 @@ class ChatResponse(BaseModel):
 
 
 # ======== 流式响应模型 ========
+
+"""
+ChatStreamResponse
+    message: 
+        delta: 
+            text: Optional[str]
+            reasoning: Optional[str]
+        start_reason: Optional[str]
+        finish_reason: Optional[str]
+    model: Optional[str]
+    usage: 
+        input_tokens: int
+        output_tokens: int
+        total_tokens: int
+"""
 
 
 class ContentDelta(BaseModel):

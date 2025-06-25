@@ -1,205 +1,219 @@
-"""Rich logging utilities for MengLong.
-
-This module combines the Python logging module with Rich for beautiful and structured logging.
-"""
-
 import logging
-import sys
-from enum import Enum
-from typing import Any, Dict, List, Optional, Union
-
 from rich.console import Console
+from enum import Enum
 from rich.logging import RichHandler
-from rich.panel import Panel
-from rich.style import Style
 from rich.text import Text
+from typing import Optional, Dict, Any
+from rich.style import Style
+from rich.panel import Panel
 from rich.table import Table
 from rich import box
+from rich.theme import Theme
 
-# Create console instance
-console = Console()
+from .common import MessageType
 
-# Configure logging with Rich
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(message)s",
-    datefmt="[%X]",
-    handlers=[RichHandler(rich_tracebacks=True, console=console, show_time=False)],
-)
+# 定义自定义日志级别
+SUCCESS_LEVEL = 25  # 介于 INFO(20) 和 WARNING(30) 之间
+SYSTEM_LEVEL = 22
+AGENT_LEVEL = 23
+TOOL_LEVEL = 24
+USER_LEVEL = 21
+FAILURE_LEVEL = 35  # 介于 WARNING(30) 和 ERROR(40) 之间
 
-# Create logger
-logger = logging.getLogger("menglong")
-
-
-class MessageType(Enum):
-    """Message types for different styling."""
-
-    INFO = "info"
-    SUCCESS = "success"
-    WARNING = "warning"
-    ERROR = "error"
-    SYSTEM = "system"
-    USER = "user"
-    AGENT = "agent"
-    DEBUG = "debug"
+# 注册自定义日志级别
+logging.addLevelName(
+    SUCCESS_LEVEL, MessageType.SUCCESS.value.upper()
+)  # 使用 MessageType 的值作为日志级别名称
+logging.addLevelName(SYSTEM_LEVEL, MessageType.SYSTEM.value.upper())
+logging.addLevelName(AGENT_LEVEL, MessageType.AGENT.value.upper())
+logging.addLevelName(TOOL_LEVEL, MessageType.TOOL.value.upper())
+logging.addLevelName(USER_LEVEL, MessageType.USER.value.upper())
+logging.addLevelName(FAILURE_LEVEL, MessageType.FAILURE.value.upper())
 
 
-# Define styles for different message types
-STYLES = {
-    MessageType.INFO: Style(color="cyan"),
-    MessageType.SUCCESS: Style(color="green"),
-    MessageType.WARNING: Style(color="yellow"),
-    MessageType.ERROR: Style(color="red", bold=True),
-    MessageType.SYSTEM: Style(color="bright_blue"),
-    MessageType.USER: Style(color="bright_white"),
-    MessageType.AGENT: Style(color="bright_green"),
-    MessageType.DEBUG: Style(color="bright_black"),
-}
-
-# Map MessageType to logging levels
-LOG_LEVELS = {
-    MessageType.INFO: logging.INFO,
-    MessageType.SUCCESS: logging.INFO,
-    MessageType.WARNING: logging.WARNING,
-    MessageType.ERROR: logging.ERROR,
-    MessageType.SYSTEM: logging.INFO,
-    MessageType.USER: logging.INFO,
-    MessageType.AGENT: logging.INFO,
-    MessageType.DEBUG: logging.DEBUG,
-}
-
-
-def print(
-    message: Any,
-    msg_type: Union[MessageType, str] = MessageType.INFO,
-    title: Optional[str] = None,
-    use_panel: bool = False,
-    log: bool = True,
-) -> None:
-    """Rich print and log function to replace standard print.
-
-    Args:
-        message: The message to print
-        msg_type: Type of message (determines styling)
-        title: Optional title for the panel
-        use_panel: Whether to use a panel for output
-        log: Whether to also log the message using the logging module
+class RichLoggerConfig:
     """
-    # Convert string message type to enum if needed
-    if isinstance(msg_type, str):
-        try:
-            msg_type = MessageType(msg_type)
-        except ValueError:
-            msg_type = MessageType.INFO
+    Configuration class for rich logging.
+    """
 
-    style = STYLES.get(msg_type, STYLES[MessageType.INFO])
+    _instance = None
 
-    # Format the message for display
-    if use_panel:
-        formatted_msg = Panel(
-            str(message), title=title, style=style, border_style=style, expand=False
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(RichLoggerConfig, cls).__new__(cls)
+            cls._instance.__initialized = False
+        return cls._instance
+
+    def __init__(self, level: str = "INFO", log_file: str = None):
+        """
+        Initialize the RichLoggerConfig with a logging level and optional log file.
+
+        :param level: The logging level (e.g., 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL').
+        :param log_file: Optional path to a log file where logs will be written.
+        """
+        if self.__initialized:
+            return
+        self.__initialized = True
+
+        self.level = level
+        self.log_file = log_file
+        self.console = None
+        self.logger = None
+        self.rich_handler = None
+        self.file_handler = None
+        self.configure()
+
+    def configure(
+        self,
+        level: str = "INFO",
+        log_file: Optional[str] = None,
+        enable_output: bool = True,
+        enable_file: bool = False,
+    ) -> None:
+        """Configure logging handlers and formatters."""
+
+        self.reset_logger()
+
+        # 将字符串级别转换为数字级别
+        if isinstance(level, str):
+            level = getattr(logging, level.upper(), logging.INFO)
+        self.level = level
+
+        theme = Theme(
+            {
+                # --- 标准日志级别颜色
+                # "logging.level.debug": Style(color="green"),
+                # "logging.level.info": Style(color="cyan"),
+                # "logging.level.warning": Style(color="yellow"),
+                # "logging.level.error": Style(color="red"),
+                # "logging.level.critical": Style(color="red", bold=True),
+                # --- 自定义日志级别颜色
+                "logging.level.success": Style(color="green", bold=True),
+                "logging.level.system": Style(color="bright_blue"),
+                "logging.level.agent": Style(color="bright_green"),
+                "logging.level.tool": Style(color="purple"),
+                "logging.level.user": Style(color="bright_white"),
+                "logging.level.failure": Style(color="red", bold=True),
+                # --- 消息内容样式（用于 markup）
+                # "debug": Style(color="green"),  # 绿
+                # "info": Style(color="cyan"),  # 青
+                # "warning": Style(color="yellow"),  # 黄
+                # "error": Style(color="red"),  # 红
+                # "critical": Style(color="red", bold=True),  # 红
+                "system": Style(color="bright_blue"),  # 浅蓝
+                "user": Style(color="bright_white"),  # 浅白
+                "agent": Style(color="bright_green"),  # 浅绿
+                "tool": Style(color="purple"),  # 紫
+                "success": Style(color="green", bold=True),  # 成功
+                "failure": Style(color="red", bold=True),  # 失败
+            }
         )
-        console.print(formatted_msg)
-    else:
-        text = Text(str(message), style=style)
-        if title:
-            title_text = Text(f"{title}: ", style=Style(bold=True))
-            text = Text.assemble(title_text, text)
-        console.print(text)
+        # Rich Console
+        self.console = Console(theme=theme)
 
-    # Also log using the logging module if requested
-    if log:
-        log_level = LOG_LEVELS.get(msg_type, logging.INFO)
-        log_message = f"{title + ': ' if title else ''}{message}"
-        logger.log(log_level, log_message)
+        # Log Format
+        rich_format_pattern = "%(message)s"
+        log_format_pattern = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        self.rich_handler = RichHandler(
+            console=self.console,
+            show_time=False,
+            rich_tracebacks=True,
+            markup=True,  # 启用 markup 以支持自定义样式标签
+        )
+        self.rich_handler.setLevel(self.level)
+        self.rich_handler.setFormatter(
+            logging.Formatter(fmt=rich_format_pattern, datefmt="[%X]")
+        )
+
+        self.logger = logging.getLogger()
+        self.logger.setLevel(self.level)
+        # 清除所有现有的 handlers，避免重复输出
+        self.logger.handlers.clear()
+        self.logger.addHandler(self.rich_handler)
+        # 防止向上传播到父logger，避免重复输出
+        self.logger.propagate = False
+
+        if self.log_file and enable_file:
+            self.file_handler = logging.FileHandler(
+                self.log_file, mode="w", encoding="utf-8"
+            )
+            self.file_handler.setLevel(self.level)
+            self.file_handler.setFormatter(
+                logging.Formatter(fmt=log_format_pattern, datefmt="%Y-%m-%d %H:%M:%S")
+            )
+            self.logger.addHandler(self.file_handler)
+
+    def reset_logger(self) -> None:
+        """Reset the logger to its initial state."""
+        if self.logger is not None:
+            for handler in self.logger.handlers[:]:
+                self.logger.removeHandler(handler)
+        self.console = None
+        self.rich_handler = None
+        self.file_handler = None
+
+    def get_logger(self, name: Optional[str] = None) -> logging.Logger:
+        """Get the configured logger."""
+        if self.logger is None:
+            raise ValueError("Logger has not been configured yet.")
+        return logging.getLogger(name)
 
 
-def print_table(
-    data: list, columns: list, title: Optional[str] = None, log: bool = True
+rich_logger = RichLoggerConfig()
+
+
+def configure(
+    level: str = "INFO",
+    log_file: str = None,
+    enable_output: bool = True,
+    enable_file: bool = False,
 ) -> None:
-    """Print data in a formatted table and optionally log it.
+    """Configure rich logging with the specified settings."""
+    rich_logger.configure(
+        level=level,
+        log_file=log_file,
+        enable_output=enable_output,
+        enable_file=enable_file,
+    )
 
-    Args:
-        data: List of data rows
-        columns: List of column names
-        title: Optional title for the table
-        log: Whether to also log the table data
+
+def get_logger(name: Optional[str] = None) -> logging.Logger:
     """
-    table = Table(box=box.ROUNDED, title=title)
+    获取日志记录器的便捷方法
 
-    # Add columns
-    for column in columns:
-        table.add_column(column, style="cyan")
+    参数:
+        name: 日志记录器名称
 
-    # Add rows
-    for row in data:
-        table.add_row(*[str(item) for item in row])
-
-    console.print(table)
-
-    # Also log using the logging module if requested
-    if log and title:
-        logger.info(title)
-        for i, row in enumerate(data):
-            logger.info(f"  {columns[i]}: {', '.join(str(item) for item in row)}")
-
-
-def print_json(data: Any, title: Optional[str] = None, log: bool = True) -> None:
-    """Print JSON data with syntax highlighting and optionally log it.
-
-    Args:
-        data: JSON data to print
-        title: Optional title
-        log: Whether to also log the JSON data
+    返回:
+        logging.Logger: 日志记录器
     """
-    if title:
-        console.print(f"[bold]{title}[/bold]")
+    logger = rich_logger.get_logger(name)
 
-    console.print_json(data=data)
+    # 添加自定义日志方法
+    def success(message, *args, **kwargs):
+        logger._log(SUCCESS_LEVEL, f"[success]{message}[/success]", args, **kwargs)
 
-    # Also log using the logging module if requested
-    if log:
-        if title:
-            logger.info(title)
-        logger.info(str(data))
+    def system(message, *args, **kwargs):
+        logger._log(SYSTEM_LEVEL, f"[system]{message}[/system]", args, **kwargs)
 
+    def agent(message, *args, **kwargs):
+        logger._log(AGENT_LEVEL, f"[agent]{message}[/agent]", args, **kwargs)
 
-def print_rule(title: str = "", style: str = "cyan", log: bool = True) -> None:
-    """Print a horizontal rule with optional title and optionally log it.
+    def tool(message, *args, **kwargs):
+        logger._log(TOOL_LEVEL, f"[tool]{message}[/tool]", args, **kwargs)
 
-    Args:
-        title: Title to include in the rule
-        style: Style for the rule
-        log: Whether to also log the rule
-    """
-    console.rule(title, style=style)
+    def user(message, *args, **kwargs):
+        logger._log(USER_LEVEL, f"[user]{message}[/user]", args, **kwargs)
 
-    # Also log using the logging module if requested
-    if log and title:
-        logger.info(f"=== {title} ===")
+    def failure(message, *args, **kwargs):
+        logger._log(FAILURE_LEVEL, f"[failure]{message}[/failure]", args, **kwargs)
 
+    # 绑定自定义方法到logger对象
+    logger.success = success
+    logger.system = system
+    logger.agent = agent
+    logger.tool = tool
+    logger.user = user
+    logger.failure = failure
 
-def configure_logger(
-    level: int = logging.INFO,
-    log_file: Optional[str] = None,
-    format_str: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-) -> None:
-    """Configure the logger with custom settings.
-
-    Args:
-        level: The logging level (default: INFO)
-        log_file: Optional file path to write logs to
-        format_str: Format string for log messages
-    """
-    logger.setLevel(level)
-
-    # Create file handler if log_file is specified
-    if log_file:
-        file_handler = logging.FileHandler(log_file)
-        file_formatter = logging.Formatter(format_str)
-        file_handler.setFormatter(file_formatter)
-        logger.addHandler(file_handler)
-
-
-# Export the logger for direct usage
-get_logger = lambda: logger
+    return logger

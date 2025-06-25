@@ -21,6 +21,8 @@ from ...schema.ml_response import (
 )
 from .base_converter import BaseConverter
 
+from ....utils.log import print_json
+
 
 class AwsConverter(BaseConverter):
     """
@@ -43,33 +45,16 @@ class AwsConverter(BaseConverter):
         Returns:
             转换后的消息列表
         """
+        # print("messages:", messages)  # for debug
         system_messages = []
         prompt_messages = []
         for message in messages:
             if isinstance(message, SystemMessage):
                 system_messages.append({"text": message.content})
             elif isinstance(message, UserMessage):
-                if message.tool_id is not None:
-                    # 处理用户消息的字符串内容
-                    prompt_messages.append(
-                        {
-                            "role": message.role,
-                            "content": [
-                                {
-                                    "toolResult": {
-                                        "toolUseId": (message.tool_id),
-                                        "content": [
-                                            {"json": {"data": message.content}}
-                                        ],
-                                    }
-                                }
-                            ],
-                        }
-                    )
-                else:
-                    prompt_messages.append(
-                        {"role": message.role, "content": [{"text": message.content}]}
-                    )
+                prompt_messages.append(
+                    {"role": message.role, "content": [{"text": message.content}]}
+                )
             elif isinstance(message, AssistantMessage):
                 prompt_messages.append(
                     {"role": message.role, "content": [{"text": message.content}]}
@@ -79,8 +64,8 @@ class AwsConverter(BaseConverter):
                 content = []
                 if message.content.text is not None:
                     content.append({"text": message.content.text})
-                if message.tool_desc is not None:
-                    for item in message.tool_desc:
+                if message.tool_descriptions is not None:
+                    for item in message.tool_descriptions:
                         content.append(
                             {
                                 "toolUse": {
@@ -91,14 +76,47 @@ class AwsConverter(BaseConverter):
                             }
                         )
                 prompt_messages.append({"role": "assistant", "content": content})
+            elif isinstance(message, ToolMessage):
+                # Handle ToolMessage for tool results
+                # 检查之前是否有工具调用结果消息被添加，如果没有则，添加一个工具结果
+                # 如果有，则将其追加到现有的工具结果中
+                if "toolResult" not in prompt_messages[-1].get("content")[0]:
+                    prompt_messages.append(
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "toolResult": {
+                                        "toolUseId": message.tool_id,
+                                        "content": [{"text": message.content}],
+                                    }
+                                }
+                            ],
+                        }
+                    )
+                else:
+                    prompt_messages[-1]["content"].append(
+                        {
+                            "toolResult": {
+                                "toolUseId": message.tool_id,
+                                "content": [{"text": message.content}],
+                            }
+                        }
+                    )
+
             else:
                 raise ValueError(f"Unsupported message type: {type(message)}")
         return system_messages, prompt_messages
 
     @staticmethod
-    def normalize_response(response):
+    def normalize_response(response, debug=False) -> ChatResponse:
         """将AWS响应标准化为MLong的响应格式。"""
-        # print("response:", response) # for debug
+        if debug:
+            # 如果需要调试输出，可以取消注释以下行
+            print_json(
+                response,
+                title="aws response",
+            )  # for debug
         output = response.get("output")
         content = Content(text=None)
         # message = Message(content=content, finish_reason=response["stopReason"])
@@ -116,7 +134,7 @@ class AwsConverter(BaseConverter):
             if "text" in output["message"]["content"][index]:
                 content.text = output["message"]["content"][index]["text"]
                 index += 1
-            desc = [
+            descriptions = [
                 ToolDesc(
                     id=item["toolUse"]["toolUseId"],
                     type="tool_use",
@@ -128,7 +146,7 @@ class AwsConverter(BaseConverter):
             message = Message(
                 content=content,
                 finish_reason=response["stopReason"],
-                tool_desc=desc,
+                tool_descriptions=descriptions,
             )
         else:
             content.text = output["message"]["content"][0]["text"]
@@ -151,6 +169,7 @@ class AwsConverter(BaseConverter):
     @staticmethod
     def normalize_stream_response(
         response_stream,
+        debug: bool = False,
     ) -> Generator:
         """将AWS流式响应标准化为MLong的响应格式。"""
         # 返回生成器
@@ -160,6 +179,12 @@ class AwsConverter(BaseConverter):
             start = None
             finish = None
             usage = None
+            if debug:
+                # 如果需要调试输出，可以取消注释以下行
+                print_json(
+                    chunk,
+                    title="aws chunk",
+                )
             # for debug
             # print(chunk)
             # 处理不同类型的消息
@@ -219,3 +244,33 @@ class AwsConverter(BaseConverter):
                 finish_reason=finish,
             )
             yield ChatStreamResponse(message=message, model_id=None, usage=usage)
+
+    @staticmethod
+    def convert_tools(tools: List, model_id: str) -> List[Dict]:
+        """将工具转换为适合模型的格式。"""
+        if not tools:
+            return []
+
+        formatted_tools = []
+        for tool in tools:
+            tool_info = tool._tool_info
+            match model_id:
+                case model_id if "claude" in model_id:
+                    formatted_tool = {
+                        "toolSpec": {
+                            "name": tool_info.name,
+                            "description": tool_info.description,
+                            "inputSchema": {"json": tool_info.parameters},
+                        }
+                    }
+                case _:
+                    formatted_tool = {
+                        "toolSpec": {
+                            "name": tool_info.name,
+                            "description": tool_info.description,
+                            "inputSchema": {"json": tool_info.parameters},
+                        }
+                    }
+            formatted_tools.append(formatted_tool)
+
+        return formatted_tools

@@ -56,12 +56,18 @@ class InfinigenceProvider(Provider):
         }
         messages = self.converter.convert_request(messages)
         payload = {"model": model_id, "messages": messages}
+        if kwargs.get("tools", None):
+            format_tools = self.converter.convert_tools(kwargs["tools"])
+            payload["tools"] = format_tools
+
+        debug = kwargs.get("debug", False)
+
         # 如果stream为True，则返回流式响应
         if kwargs.get("stream", False):
             return self.chat_stream(model_id, messages, **kwargs)
         else:
             response = requests.post(url, json=payload, headers=headers)
-            response = self.converter.normalize_response(response.json())
+            response = self.converter.normalize_response(response.json(), debug=debug)
             return response
 
     def chat_stream(self, model_id, messages, **kwargs):

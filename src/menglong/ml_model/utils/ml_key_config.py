@@ -4,7 +4,7 @@ import yaml
 import os
 from typing import Any, Dict
 from pathlib import Path
-from ...utils.log import rich_print, RichMessageType
+from ...utils.log import print_message, MessageType
 
 
 def load_config(config_path: str = ".configs.toml") -> Dict[str, Any]:
@@ -25,9 +25,7 @@ def load_config(config_path: str = ".configs.toml") -> Dict[str, Any]:
         # 1. 首先，尝试从当前工作目录加载（适用于作为库被其他项目使用的情况）
         cwd_config = Path.cwd() / config_path
         if cwd_config.exists():
-            rich_print(
-                f"在当前工作目录找到配置文件: {cwd_config}", RichMessageType.INFO
-            )
+            print_message(f"在当前工作目录找到配置文件: {cwd_config}", MessageType.INFO)
             config_path = cwd_config
         else:
             # 2. 获取当前文件的路径
@@ -44,19 +42,19 @@ def load_config(config_path: str = ".configs.toml") -> Dict[str, Any]:
                 lib_config_path = project_root / config_path
 
                 if lib_config_path.exists():
-                    rich_print(
+                    print_message(
                         f"在库项目根目录找到配置文件: {lib_config_path}",
-                        RichMessageType.INFO,
+                        MessageType.INFO,
                     )
                     config_path = lib_config_path
                 else:
                     # 4. 如果库项目根目录也没有找到，保持原始路径（可能之后会提示不存在）
-                    rich_print(
+                    print_message(
                         f"未找到配置文件，将使用原始路径: {config_path}",
-                        RichMessageType.WARNING,
+                        MessageType.WARNING,
                     )
 
-    rich_print(f"{config_path}", RichMessageType.INFO, title="尝试加载配置文件")
+    print_message(f"{config_path}", MessageType.INFO, title="尝试加载配置文件")
 
     if config_path.exists():
         try:
@@ -68,8 +66,8 @@ def load_config(config_path: str = ".configs.toml") -> Dict[str, Any]:
             with open(config_path, "rb") as f:
                 return toml.load(f)
         except Exception as e:
-            rich_print(f"加载配置文件失败: {e}", RichMessageType.ERROR)
+            print_message(f"加载配置文件失败: {e}", MessageType.ERROR)
             return {}
     else:
-        rich_print(f"配置文件不存在: {config_path}", RichMessageType.WARNING)
+        print_message(f"配置文件不存在: {config_path}", MessageType.WARNING)
         return {}

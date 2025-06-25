@@ -1,5 +1,6 @@
 import asyncio
 from enum import Enum
+from abc import ABC, abstractmethod
 
 
 class TaskState(Enum):
@@ -19,6 +20,18 @@ class TaskState(Enum):
     COMPLETED = "COMPLETED"  # 已完成，任务顺利完成
     ERROR = "ERROR"  # 错误状态，任务出现未知情况，标记为错误状态
     DESTROYED = "DESTROYED"  # 销毁状态，任务已被销毁，资源已释放
+
+
+class Task(ABC):
+    """抽象任务类
+
+    所有任务必须继承此类，并实现run方法
+    """
+
+    @abstractmethod
+    async def run(self):
+        """运行任务的主逻辑"""
+        pass
 
 
 class TCB:

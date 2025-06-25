@@ -1,0 +1,59 @@
+# MengLong 监控配置示例
+
+monitor:
+  # 是否启用监控
+  enabled: true
+  
+  # 监控级别: DEBUG, INFO, WARNING, ERROR
+  level: INFO
+  
+  # 监控分类列表
+  categories:
+    - MODEL_INTERACTION    # 模型交互
+    - TOOL_CALLS          # 工具调用
+    - ERROR_TRACKING      # 错误跟踪
+    # - CONTEXT_MANAGEMENT  # 上下文管理
+    # - DATA_TRANSFORM      # 数据转换
+    # - ASYNC_TASKS         # 异步任务
+    # - WORKFLOW            # 工作流
+    # - PERFORMANCE         # 性能监控
+  
+  # 最大历史记录数
+  max_history: 1000
+  
+  # 处理器配置
+  handlers:
+    # 控制台输出
+    console:
+      enabled: true
+      format: simple  # simple 或 detailed
+    
+    # 文件输出
+    file:
+      enabled: false
+      directory: "./logs"
+      max_size: "10MB"
+      backup_count: 5
+      # 按分类分文件
+      separate_by_category: true
+  
+  # 过滤器配置
+  filters:
+    # 最小级别过滤
+    min_level: INFO
+    
+    # 排除的分类
+    exclude_categories: []
+    
+    # 包含的来源
+    include_sources: []
+    
+    # 自定义过滤规则
+    custom_rules:
+      # 只记录错误的工具调用
+      - category: TOOL_CALLS
+        condition: "level == 'ERROR'"
+      
+      # 记录耗时超过1秒的性能数据
+      - category: PERFORMANCE
+        condition: "data.duration > 1.0"

@@ -46,8 +46,8 @@ class OpenAIConverter(BaseConverter):
             elif isinstance(message, Message):
                 # 处理助手消息的列表内容
                 content = []
-                if message.tool_desc is not None:
-                    for item in message.tool_desc:
+                if message.tool_descriptions is not None:
+                    for item in message.tool_descriptions:
                         content.append(
                             {
                                 "id": item.id,
@@ -115,7 +115,7 @@ class OpenAIConverter(BaseConverter):
                     arguments=tool_call.function.arguments,
                 )
                 tool_calls_list.append(tc)
-            message.tool_desc = tool_calls_list
+            message.tool_descriptions = tool_calls_list
 
         usage = Usage(
             input_tokens=response.usage.prompt_tokens,
