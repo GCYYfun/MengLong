@@ -13,3 +13,4 @@ wheels/
 .configs.toml
 *.DS_Store
 archive/
+experience.yaml

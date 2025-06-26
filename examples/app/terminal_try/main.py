@@ -1,14 +1,33 @@
 import asyncio
 from task_agent import ChatAgent
-from tool import terminal_command, plan_task, brave_web_search
+from tool import (
+    terminal_command,
+    plan_task,
+    brave_web_search,
+    recall_experience,
+    summarize_and_save_experience,
+    abstract_experience,
+)
 
 
 async def chat_with_terminal():
     agent = ChatAgent()
     complex_task = """
-    9.11 与 9.8 哪个大？,可以用工具来辅助
+    统计下当前目录下src/menglong目录下的python文件数、函数数量、代码行数。
+    如果做过参考经验获得更好的结果，
+    如果运行成果总结下经验
     """
-    tools = [plan_task, brave_web_search, terminal_command]
+    # complex_task = """
+    # 对经验库抽象与反思下。
+    # """
+    tools = [
+        plan_task,
+        # brave_web_search,
+        terminal_command,
+        recall_experience,
+        summarize_and_save_experience,
+        abstract_experience,
+    ]
     res = await agent.chat(complex_task, tools)  # 添加 await
     await asyncio.sleep(0)  # 模拟异步等待
     return res

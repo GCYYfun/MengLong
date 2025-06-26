@@ -22,7 +22,7 @@ class Model:
 
         # 加载配置文件
         provider_config = load_config()
-        print_json(provider_config, title="配置文件内容")
+        # print_json(provider_config, title="配置文件内容")
 
         # 检查配置文件中是否含有default键
         if "default" in provider_config:

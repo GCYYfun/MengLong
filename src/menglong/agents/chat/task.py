@@ -1,11 +1,14 @@
 from abc import ABC
+from contextlib import contextmanager
+from contextvars import ContextVar
 from copy import deepcopy
 from dataclasses import dataclass, field
 import heapq
 from json import JSONDecodeError
 import json
 import time
-from typing import Dict, List, Optional, Any, Callable, Tuple
+import uuid
+from typing import Dict, List, Optional, Any, Callable, Tuple, Awaitable
 from enum import Enum
 import asyncio
 
@@ -79,6 +82,7 @@ class TaskDesc:
     start_time: Optional[float] = None
     end_time: Optional[float] = None
     worker: Optional[asyncio.Task] = None
+    is_first_run: bool = True
 
 
 class TaskManager:
@@ -116,6 +120,7 @@ class TaskManager:
         """获取任务详情"""
         return self.task_descriptions.get(task_id)
 
+    # Local Task
     async def run_task(self, task_id: int) -> Any:
         """执行任务"""
         task = self.get_task(task_id)
@@ -166,8 +171,10 @@ class TaskManager:
         if tools is None or tools is []:
             res = self.agent.model.chat(mc)
             r = res.message.content.text
+            mc.append(assistant(content=str(r)))
         else:
             done = True
+            need_break = False
 
             def check_done(res):
                 text = res.message.content.text
@@ -188,9 +195,202 @@ class TaskManager:
                     done = check_done(res)
                 else:
                     print_json(res.message.model_dump(), title="Tool call response")
-                    tool_results = self.execute_tool_call(
+                    tool_results = await self.execute_tool_call(
                         task_id, tools, res.message.tool_descriptions
                     )
+
+                    mc.append(res.message)
+                    for tool_result in tool_results:
+                        tool_results_message = ToolMessage(
+                            content=json.dumps(
+                                tool_result["content"], ensure_ascii=False
+                            ),
+                            tool_id=tool_result.get("id"),
+                        )
+                        print_message(tool_result["content"], title="Tool result")
+                        mc.append(tool_results_message)
+
+                    # step_res = self.agent.model.chat(messages=mc, tools=tools)
+
+                    # if not done:
+                    #     mc.append()
+                    # r = step_res.message.content.text
+                    r = [tool_result["content"] for tool_result in tool_results]
+                    task_desc.is_first_run = False
+
+        print_message(r, title=f"Task {task_id} result", msg_type=MessageType.AGENT)
+        task.result = r
+
+        print("---------assistant-----------")
+        print(mc)
+        print("--------------------")
+        # task_desc = self.get_task_desc(task_id)
+        # task_desc.status = TaskStatus.COMPLETED
+        # task_desc.end_time = asyncio.get_event_loop().time()
+        # task_desc.worker = None  # 清理worker引用
+        await asyncio.sleep(0)  # 确保协程调度
+
+    async def run_task_async(self, task_id: int) -> Any:
+        """执行任务"""
+        task = self.get_task(task_id)
+        task_desc = self.get_task_desc(task_id)
+
+        if task_desc.is_first_run:
+            print_rule(f"Running task {task_id}")
+            if not task:
+                raise ValueError(f"Task {task_id} not found")
+            print_message(f"Task {task_id} found,{task}")
+            prompt = task.prompt
+            tools = task.tools
+            mc = task_desc.context.message_context
+
+            print_message(f"{prompt}")
+            d = [tool._tool_info.name for tool in tools] if tools else []
+            print_message(f"Tools required: {d}")
+
+            # 检查任务依赖的结果
+            dep_status = []
+            for dep in task_desc.dependencies:
+                t = self.get_task(dep)
+                dep_name = t.prompt
+                dep_result = t.result
+                dep_status.append({"name": dep_name, "result": dep_result})
+                if not dep_result:
+                    raise ValueError(
+                        f"Task {task_id} depends on {dep} but it's not completed"
+                    )
+            # 任务状态信息
+            done_token = "[DONE]"
+            status = """
+            当前任务依赖状态:
+                {dep_status}
+
+            任务结束:
+                确认任务是否正确完成，当正确完成时，只输出任务预期输出并以{done_token}结尾，自动结束。
+                如果选择plan_task工具，任务的执行结果就是plan_task工具结果，并输出{done_token}结尾，其余任务快速交给子任务执行。
+    """
+
+            mc.append(
+                user(
+                    content=prompt
+                    + status.format(dep_status=dep_status, done_token=done_token)
+                )
+            )
+            print("---------user-----------")
+            print(mc)
+            print("--------------------")
+            if tools is None or tools is []:
+                res = self.agent.model.chat(mc)
+                r = res.message.content.text
+                mc.append(assistant(content=str(r)))
+            else:
+                done = True
+                need_break = False
+
+                def check_done(res):
+                    text = res.message.content.text
+                    if text and text.strip().endswith(done_token):
+                        res.message.content.text = text.strip(done_token)
+                        return False
+                    return True
+
+                while done:
+                    res = self.agent.model.chat(
+                        mc,
+                        tools=tools,
+                    )
+
+                    if not self.is_use_tool(res.message):
+                        r = res.message.content.text
+                        mc.append(assistant(content=r))
+                        done = check_done(res)
+                    else:
+                        print_json(res.message.model_dump(), title="Tool call response")
+                        tool_results = self.execute_tool_call(
+                            task_id, tools, res.message.tool_descriptions
+                        )
+                        for tool_results in tool_results:
+                            if tool_results.get("remote", False):
+                                need_break = True
+
+                        if need_break:
+                            task_desc.is_first_run = False
+                            break
+                        mc.append(res.message)
+                        for tool_result in tool_results:
+                            tool_results_message = ToolMessage(
+                                content=json.dumps(
+                                    tool_result["content"], ensure_ascii=False
+                                ),
+                                tool_id=tool_result.get("id"),
+                            )
+                            print_message(tool_result["content"], title="Tool result")
+                            mc.append(tool_results_message)
+
+                        # step_res = self.agent.model.chat(messages=mc, tools=tools)
+
+                        # if not done:
+                        #     mc.append()
+                        # r = step_res.message.content.text
+                        r = [tool_result["content"] for tool_result in tool_results]
+                        task_desc.is_first_run = False
+
+            print_message(r, title=f"Task {task_id} result", msg_type=MessageType.AGENT)
+            task.result = r
+
+            print("---------assistant-----------")
+            print(mc)
+            print("--------------------")
+            # task_desc = self.get_task_desc(task_id)
+            # task_desc.status = TaskStatus.COMPLETED
+            # task_desc.end_time = asyncio.get_event_loop().time()
+            # task_desc.worker = None  # 清理worker引用
+            await asyncio.sleep(0)  # 确保协程调度
+        else:
+            responses = task_desc.context.remote_responses
+            mc = task_desc.context.message_context
+            temp_tool_calls = task_desc.context.temp_tool_calls
+            mc.append(temp_tool_calls)
+            for tool_result in responses:
+                tool_results_message = ToolMessage(
+                    content=json.dumps(tool_result["content"], ensure_ascii=False),
+                    tool_id=tool_result.get("id"),
+                )
+                print_message(tool_result["content"], title="Tool result")
+                mc.append(tool_results_message)
+            r = [tool_result["content"] for tool_result in tool_results]
+
+            done = True
+            need_break = False
+
+            def check_done(res):
+                text = res.message.content.text
+                if text and text.strip().endswith(done_token):
+                    res.message.content.text = text.strip(done_token)
+                    return False
+                return True
+
+            while done:
+                res = self.agent.model.chat(
+                    mc,
+                    tools=tools,
+                )
+
+                if not self.is_use_tool(res.message):
+                    r = res.message.content.text
+                    mc.append(assistant(content=r))
+                    done = check_done(res)
+                else:
+                    print_json(res.message.model_dump(), title="Tool call response")
+                    tool_results = await self.execute_tool_call(
+                        task_id, tools, res.message.tool_descriptions
+                    )
+                    for tool_results in tool_results:
+                        if tool_results.get("remote", False):
+                            need_break = True
+
+                    if need_break:
+                        break
                     mc.append(res.message)
                     for tool_result in tool_results:
                         tool_results_message = ToolMessage(
@@ -209,18 +409,13 @@ class TaskManager:
                     # r = step_res.message.content.text
                     r = [tool_result["content"] for tool_result in tool_results]
 
-        print_message(r, title=f"Task {task_id} result", msg_type=MessageType.AGENT)
-        task.result = r
-        mc.append(assistant(content=str(r)))
-        print("---------assistant-----------")
-        print(mc)
-        print("--------------------")
-        # task_desc = self.get_task_desc(task_id)
-        # task_desc.status = TaskStatus.COMPLETED
-        # task_desc.end_time = asyncio.get_event_loop().time()
-        # task_desc.worker = None  # 清理worker引用
-        await asyncio.sleep(0)  # 确保协程调度
-        # return r
+            print_message(r, title=f"Task {task_id} result", msg_type=MessageType.AGENT)
+            task.result = r
+
+            print("---------assistant-----------")
+            print(mc)
+            print("--------------------")
+            pass
 
     def is_use_tool(self, message):
         """检查消息是否包含工具调用"""
@@ -228,7 +423,9 @@ class TaskManager:
             return True
         return False
 
-    def execute_tool_call(self, task_id: int, tools: Dict, tool_descriptions) -> List:
+    async def execute_tool_call(
+        self, task_id: int, tools: Dict, tool_descriptions
+    ) -> List:
         """执行工具调用
 
         Args:
@@ -252,17 +449,98 @@ class TaskManager:
                 arguments = tool_call.arguments
 
             # 执行工具调用
-            tool_result = self._execute_tool(task_id, tools, tool_name, arguments)
+            tool_result = await self._execute_tool(task_id, tools, tool_name, arguments)
+
             tool_results.append({"id": tool_call.id, "content": tool_result})
 
         return tool_results
 
-    def _execute_tool(
+    async def _execute_tool(
         self, task_id: int, tools: List, tool_name: str, arguments: Dict
-    ) -> str:
+    ) -> Tuple[str, bool]:
         """执行工具调用
 
         Args:
+            tool_name: 工具名称
+            arguments: 工具参数
+
+        Returns:
+            工具执行结果
+        """
+        tools_dict = {
+            tool._tool_info.name: {
+                "function": tool._tool_info.func,
+                "description": tool._tool_info.description,
+                "parameters": tool._tool_info.parameters,
+                # "remote": tool._tool_info.remote,
+            }
+            for tool in tools
+        }
+        if tool_name not in tools_dict:
+            return f"Error: Tool '{tool_name}' not found", False
+
+        try:
+            match tool_name:
+                case "plan_task":
+                    # 特殊处理 plan_task 工具
+                    tool_func = tools_dict[tool_name]["function"]
+                    print_json(
+                        arguments, title=f"Executing tool '{tool_name}' with arguments"
+                    )
+                    args = {}  # 不修改arguments
+                    args.update(arguments)
+                    args.update({"tools": tools_dict})
+                    result = tool_func(**args)
+                    self.parse_task_plan(task_id, result)
+                    return (
+                        (
+                            json.dumps(result, ensure_ascii=False)
+                            if isinstance(result, dict)
+                            else str(result)
+                        ),
+                        False,
+                    )
+                case _:
+                    # if tools_dict[tool_name].get("remote", False):
+                    #     tool_func = tools_dict[tool_name]["function"]
+                    #     print_json(
+                    #         arguments,
+                    #         title=f"Executing tool '{tool_name}' with arguments",
+                    #     )
+                    #     result = tool_func(**arguments)
+                    #     return (
+                    #         (
+                    #             json.dumps(result, ensure_ascii=False)
+                    #             if isinstance(result, dict)
+                    #             else str(result)
+                    #         ),
+                    #         True,
+                    #     )
+                    # else:
+                    tool_func = tools_dict[tool_name]["function"]
+                    print_json(
+                        arguments,
+                        title=f"Executing tool '{tool_name}' with arguments",
+                    )
+                    result = tool_func(**arguments)
+                    return (
+                        (
+                            json.dumps(result, ensure_ascii=False)
+                            if isinstance(result, dict)
+                            else str(result)
+                        ),
+                        False,
+                    )
+        except Exception as e:
+            return f"Error executing tool '{tool_name}': {str(e)}", False
+
+    def _execute_remote_tool(
+        self, task_id: int, tools: List, tool_name: str, arguments: Dict
+    ) -> str:
+        """执行远程工具调用
+
+        Args:
+
             tool_name: 工具名称
             arguments: 工具参数
 
@@ -304,6 +582,9 @@ class TaskManager:
                         arguments, title=f"Executing tool '{tool_name}' with arguments"
                     )
                     result = tool_func(**arguments)
+                    # 根据结果判断
+                    # 1. 如果需要等待远程结果，挂起任务，等待远程结果返回后恢复
+                    # 2. 否则直接返回结果
                     return (
                         json.dumps(result, ensure_ascii=False)
                         if isinstance(result, dict)
@@ -311,42 +592,6 @@ class TaskManager:
                     )
         except Exception as e:
             return f"Error executing tool '{tool_name}': {str(e)}"
-
-    # @tool
-    # def parse_task_plan(task_plan: Dict) -> List[Task]:
-    #     # 步骤1：创建子任务ID映射表
-    #     subtask_id_map = {}
-    #     tasks = []
-    #     task_descs = []
-
-    #     # 第一轮遍历：创建所有任务对象并建立ID映射
-    #     for subtask in task_plan["subtasks"]:
-    #         # 生成唯一整数ID
-    #         new_task_id = TaskID.next()
-    #         # 建立原始ID到新ID的映射
-    #         subtask_id_map[subtask["task_id"]] = new_task_id
-
-    #         # 创建Task对象
-    #         task = Task(
-    #             task_id=new_task_id,
-    #             prompt=subtask["description"],
-    #             tools=subtask["tool_require"],
-    #         )
-    #         tasks.append(task)
-
-    #         # 创建TaskDesc对象（依赖项暂不处理）
-    #         task_desc = TaskDesc(task_id=new_task_id, dependencies=[])  # 将在第二轮处理
-    #         task_descs.append(task_desc)
-
-    #     # 第二轮遍历：处理依赖关系
-    #     for subtask, task_desc in zip(task_plan["subtasks"], task_descs):
-    #         # 转换依赖项ID
-    #         for dep_id in subtask.get("dependencies", []):
-    #             if dep_id in subtask_id_map:
-    #                 task_desc.dependencies.append(subtask_id_map[dep_id])
-
-    #     # 返回Task对象列表（TaskDesc需要另外存储）
-    #     return tasks, task_descs
 
     def parse_task_plan(self, current_task_id: int, task_plan: Dict) -> tuple:
         """
@@ -523,7 +768,9 @@ class TaskScheduler:
 
                             desc.status = TaskStatus.RUNNING
                             desc.start_time = asyncio.get_event_loop().time()
-                            worker = asyncio.create_task(self.run_task(task_id))
+                            worker = asyncio.create_task(
+                                self._run_task_with_callback(task_id)
+                            )
                             print_message(f"Task {task_id} started")
                             desc.worker = worker
                             print_message(desc)
@@ -619,7 +866,11 @@ class TaskScheduler:
 
         # 检查是否有待执行的任务
         for desc in self.task_manager.task_descriptions.values():
-            if desc.status in [TaskStatus.CREATED, TaskStatus.READY]:
+            if desc.status in [
+                TaskStatus.CREATED,
+                TaskStatus.READY,
+                TaskStatus.WAITING_REMOTE,
+            ]:
                 print_message(f"Still have pending tasks in status: {desc.status}")
                 return False
 
@@ -684,7 +935,7 @@ class TaskScheduler:
             desc.status = TaskStatus.CANCELED
             desc.end_time = asyncio.get_event_loop().time()
 
-    async def run_task(self, task_id: int):
+    async def _run_task_with_callback(self, task_id: int):
         """执行任务并在完成时触发事件"""
         try:
             result = await self.task_manager.run_task(task_id)
