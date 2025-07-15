@@ -80,10 +80,10 @@ class InfinigenceConverter(BaseConverter):
                     }
                 )
             elif isinstance(message, ToolMessage):
-                print_json(
-                    message.model_dump(),
-                    title="ToolMessage",
-                )
+                # print_json(
+                #     message.model_dump(),
+                #     title="ToolMessage",
+                # )
                 format_messages.append(
                     {
                         "role": message.role,

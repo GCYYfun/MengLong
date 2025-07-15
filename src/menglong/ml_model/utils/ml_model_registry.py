@@ -52,9 +52,9 @@ MODEL_REGISTRY: Dict[str, Tuple[str, str]] = {
         "infinigence",
         "claude-3-7-sonnet-20250219",
     ),
-    "claude-4-sonnet-20250514": (
+    "claude-sonnet-4-20250514": (
         "infinigence",
-        "claude-4-sonnet-20250514",
+        "claude-sonnet-4-20250514",
     ),
 }
 

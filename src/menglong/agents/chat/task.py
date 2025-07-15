@@ -55,6 +55,7 @@ class TaskID:
 class TaskContext:
     """执行上下文，保存执行过程中的状态"""
 
+    system: str = ""
     message_context: List[Any] = field(default_factory=list)
     # file_operations: List[Dict] = field(default_factory=list)
     # command_results: List[Dict] = field(default_factory=list)
@@ -490,7 +491,10 @@ class TaskManager:
                     args = {}  # 不修改arguments
                     args.update(arguments)
                     args.update({"tools": tools_dict})
-                    result = tool_func(**args)
+                    if asyncio.iscoroutinefunction(tool_func):
+                        result = await tool_func(**args)
+                    else:
+                        result = tool_func(**args)
                     self.parse_task_plan(task_id, result)
                     return (
                         (
@@ -522,7 +526,10 @@ class TaskManager:
                         arguments,
                         title=f"Executing tool '{tool_name}' with arguments",
                     )
-                    result = tool_func(**arguments)
+                    if asyncio.iscoroutinefunction(tool_func):
+                        result = await tool_func(**arguments)
+                    else:
+                        result = tool_func(**arguments)
                     return (
                         (
                             json.dumps(result, ensure_ascii=False)
@@ -869,7 +876,6 @@ class TaskScheduler:
             if desc.status in [
                 TaskStatus.CREATED,
                 TaskStatus.READY,
-                TaskStatus.WAITING_REMOTE,
             ]:
                 print_message(f"Still have pending tasks in status: {desc.status}")
                 return False
