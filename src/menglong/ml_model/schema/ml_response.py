@@ -73,6 +73,13 @@ class ChatResponse(BaseModel):
     model: Optional[str] = Field(default=None, description="使用的模型标识符")
     usage: Optional[Usage] = Field(default=None, description="token使用统计")
 
+    @property
+    def text(self) -> Optional[str]:
+        """获取响应文本内容"""
+        return (
+            self.message.content.text if self.message and self.message.content else None
+        )
+
 
 # ======== 流式响应模型 ========
 

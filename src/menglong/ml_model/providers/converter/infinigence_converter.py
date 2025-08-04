@@ -37,11 +37,11 @@ class InfinigenceConverter(BaseConverter):
 
         format_messages = []
         for message in messages:
-            if debug:
-                print_json(
-                    message.model_dump(),
-                    title="Infinigence request",
-                )
+            # if debug:
+            #     print_json(
+            #         message.model_dump(),
+            #         title="Infinigence request",
+            #     )
             if isinstance(message, SystemMessage):
                 format_messages.append(
                     {"role": message.role, "content": message.content}

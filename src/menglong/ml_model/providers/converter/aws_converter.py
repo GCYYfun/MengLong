@@ -103,7 +103,17 @@ class AwsConverter(BaseConverter):
                             }
                         }
                     )
-
+            elif isinstance(message, dict):
+                # 处理原始字典消息
+                if "role" in message and "content" in message:
+                    role = message["role"]
+                    content = message["content"]
+                    if role == "system":
+                        system_messages.append({"text": content})
+                    else:
+                        prompt_messages.append(
+                            {"role": role, "content": [{"text": content}]}
+                        )
             else:
                 raise ValueError(f"Unsupported message type: {type(message)}")
         return system_messages, prompt_messages

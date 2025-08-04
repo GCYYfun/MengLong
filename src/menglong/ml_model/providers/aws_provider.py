@@ -80,6 +80,8 @@ class AwsProvider(Provider):
         for key, value in kwargs.items():
             if key == "stream":
                 continue
+            if key == "debug":
+                continue
             if key in self.inference_parameters:
                 inference_config[key] = value
             elif key == "tools":
