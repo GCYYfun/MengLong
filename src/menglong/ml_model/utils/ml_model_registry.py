@@ -56,6 +56,10 @@ MODEL_REGISTRY: Dict[str, Tuple[str, str]] = {
         "infinigence",
         "claude-sonnet-4-20250514",
     ),
+    "Qwen3-32B": (
+        "osoai",
+        "Qwen3-32B",
+    ),
 }
 
 MODEL_PRICES: Dict[str, float] = {

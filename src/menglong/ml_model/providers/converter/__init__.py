@@ -8,6 +8,7 @@ from .poe_converter import PoeConverter
 from .deepseek_converter import DeepseekConverter
 from .openai_converter import OpenAIConverter
 from .infinigence_converter import InfinigenceConverter
+from .osoai_converter import OpenSourceConverter
 
 __all__ = [
     "BaseConverter",
@@ -15,4 +16,5 @@ __all__ = [
     "DeepseekConverter",
     "OpenAIConverter",
     "InfinigenceConverter",
+    "OpenSourceConverter",
 ]

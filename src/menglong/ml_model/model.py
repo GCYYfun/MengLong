@@ -21,13 +21,13 @@ class Model:
         self.provider_config = {}
 
         # 加载配置文件
-        provider_config = load_config()
+        key_config = load_config()
         # print_json(provider_config, title="配置文件内容")
 
         # 检查配置文件中是否含有default键
-        if "default" in provider_config:
+        if "default" in key_config:
             # 如果有，将default的值作为默认值
-            default_config = provider_config.pop("default")
+            default_config = key_config.pop("default")
             self.model_id = model_id or default_config.get("model_id")
             self._embed_model_id = default_config.get("embed_id") or None
         else:
@@ -37,13 +37,18 @@ class Model:
         self.provider, _ = MODEL_REGISTRY[self.model_id]
 
         # 合并配置
-        self.provider_config = provider_config
-        if configs:
+        self.provider_config = key_config
+        if isinstance(configs, Dict[str, Dict]):
             for provider, config in configs.items():
                 if provider in self.provider_config:
                     self.provider_config[provider].update(config)
                 else:
                     self.provider_config[provider] = config
+        elif isinstance(configs, Dict):
+            # 如果configs是单个提供商的配置，直接更新
+            self.provider_config[self.provider] = configs
+        else:
+            raise ValueError("Invalid configs format")
 
         # 初始化核心组件
         self.init_providers(self.provider_config)
