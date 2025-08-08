@@ -15,4 +15,15 @@ class Agent(ABC):
 
     @abstractmethod
     def run(self):
+        """执行代理任务"""
+        pass
+
+    @abstractmethod
+    async def stop(self):
+        """停止代理任务"""
+        pass
+
+    @abstractmethod
+    def is_running(self) -> bool:
+        """检查代理是否正在运行"""
         pass

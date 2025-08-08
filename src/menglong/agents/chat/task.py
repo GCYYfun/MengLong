@@ -150,6 +150,19 @@ class TaskManager:
         self, original_prompt: str, dependency_status: List[Dict[str, Any]]
     ) -> str:
         """创建包含依赖状态的任务提示"""
+
+        status_template = """
+        当前任务依赖状态:
+            {dep_status}
+        """
+
+        return original_prompt + status_template.format(dep_status=dependency_status)
+
+    def _create_auto_end_task_prompt(
+        self, original_prompt: str, dependency_status: List[Dict[str, Any]]
+    ) -> str:
+        """创建包含依赖状态的任务提示"""
+
         status_template = """
         当前任务依赖状态:
             {dep_status}
@@ -184,7 +197,7 @@ class TaskManager:
             return []
         return [tool._tool_info.name for tool in tools]
 
-    async def run_task(self, task_id: int) -> Any:
+    async def run_task(self, task_id: int, auto_end: bool = False) -> Any:
         """执行任务"""
         task, task_desc = self._validate_task_exists(task_id)
 
@@ -201,7 +214,12 @@ class TaskManager:
         print_message(f"Tools required: {tool_names}")
 
         # 构建提示信息
-        full_prompt = self._create_task_prompt(task.prompt, dependency_status)
+        if auto_end:
+            full_prompt = self._create_auto_end_task_prompt(
+                task.prompt, dependency_status
+            )
+        else:
+            full_prompt = self._create_task_prompt(task.prompt, dependency_status)
         message_context.append(user(content=full_prompt))
 
         # 执行任务
@@ -553,7 +571,7 @@ class TaskScheduler:
             except asyncio.CancelledError:
                 pass
 
-    async def scheduler_loop(self) -> None:
+    async def scheduler_loop(self, auto_end: bool = False) -> None:
         """调度器主循环"""
         try:
             while not self.stop_event.is_set():
@@ -561,7 +579,7 @@ class TaskScheduler:
                 await self._cleanup_completed_tasks()
 
                 # 查找并执行就绪任务
-                await self._process_ready_tasks()
+                await self._process_ready_tasks(auto_end=auto_end)
 
                 # 检查是否应该停止
                 if await self._should_stop_scheduler():
@@ -576,7 +594,7 @@ class TaskScheduler:
         finally:
             await self._cleanup_all_tasks()
 
-    async def _process_ready_tasks(self) -> None:
+    async def _process_ready_tasks(self, auto_end: bool = False) -> None:
         """处理就绪任务"""
         print_rule("Finding ready tasks")
         ready_tasks = self._find_ready_tasks()
@@ -592,9 +610,9 @@ class TaskScheduler:
         while not self.task_queue.is_empty():
             task_id = self.task_queue.get()
             if task_id is not None:
-                await self._start_task_execution(task_id)
+                await self._start_task_execution(task_id, auto_end=auto_end)
 
-    async def _start_task_execution(self, task_id: int) -> None:
+    async def _start_task_execution(self, task_id: int, auto_end: bool = False) -> None:
         """开始执行任务"""
         print_message(f"Scheduling task {task_id}")
 
@@ -608,7 +626,9 @@ class TaskScheduler:
         task_desc.start_time = asyncio.get_event_loop().time()
 
         # 创建并启动工作协程
-        worker = asyncio.create_task(self._run_task_with_callback(task_id))
+        worker = asyncio.create_task(
+            self._run_task_with_callback(task_id, auto_end=auto_end)
+        )
         task_desc.worker = worker
         self.running_tasks[task_id] = worker
 
@@ -739,10 +759,12 @@ class TaskScheduler:
             task_desc.status = TaskStatus.CANCELED
             task_desc.end_time = asyncio.get_event_loop().time()
 
-    async def _run_task_with_callback(self, task_id: int) -> Any:
+    async def _run_task_with_callback(
+        self, task_id: int, auto_end: bool = False
+    ) -> Any:
         """执行任务并在完成时触发事件"""
         try:
-            result = await self.task_manager.run_task(task_id)
+            result = await self.task_manager.run_task(task_id, auto_end=auto_end)
             self.task_completed_event.set()
             return result
         except Exception as e:
