@@ -60,6 +60,10 @@ MODEL_REGISTRY: Dict[str, Tuple[str, str]] = {
         "osoai",
         "Qwen3-32B",
     ),
+    "Qwen3-8B": (
+        "osoai",
+        "Qwen3-8B",
+    ),
 }
 
 MODEL_PRICES: Dict[str, float] = {

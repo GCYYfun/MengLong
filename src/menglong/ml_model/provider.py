@@ -40,7 +40,11 @@ class ProviderFactory:
         """
         # 自动构建模块路径
         # 统一开源提供商名称
-        if provider_name == "vllm" or provider_name == "ollama":
+        if (
+            provider_name == "vllm"
+            or provider_name == "ollama"
+            or provider_name == "osoai"
+        ):
             provider_class_name = f"OpenSourceProvider"
             provider_module_name = f"osoai_provider"
         else:
