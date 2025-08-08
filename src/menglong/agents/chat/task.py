@@ -90,6 +90,7 @@ class TaskManager:
     """任务管理器"""
 
     DONE_TOKEN = "[DONE]"
+    SHUTDOWN = False
 
     def __init__(self, agent):
         """初始化任务管理器"""
@@ -98,6 +99,7 @@ class TaskManager:
         self.tasks: Dict[int, Task] = {}
         self.root_task: Optional[TaskDesc] = None
         self.new_task_callback: Optional[Callable] = None
+        self.SHUTDOWN = False
 
     def create_task(self, prompt: str, tools: Optional[List[Any]] = None) -> int:
         """创建新任务"""
@@ -178,6 +180,8 @@ class TaskManager:
 
     def _check_completion(self, response) -> bool:
         """检查任务是否完成"""
+        if self.SHUTDOWN:
+            return False
         if not hasattr(response.message, "content") or not response.message.content:
             return True
 

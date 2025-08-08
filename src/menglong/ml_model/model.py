@@ -38,17 +38,25 @@ class Model:
 
         # 合并配置
         self.provider_config = key_config
-        if isinstance(configs, Dict[str, Dict]):
-            for provider, config in configs.items():
-                if provider in self.provider_config:
-                    self.provider_config[provider].update(config)
+        if configs is not None:
+            if isinstance(configs, dict):
+                # 检查是否是嵌套字典（多个提供商配置）
+                is_nested_dict = all(
+                    isinstance(v, dict) for v in configs.values() if v is not None
+                )
+
+                if is_nested_dict and configs:
+                    # 多个提供商的配置
+                    for provider, config in configs.items():
+                        if provider in self.provider_config:
+                            self.provider_config[provider].update(config)
+                        else:
+                            self.provider_config[provider] = config
                 else:
-                    self.provider_config[provider] = config
-        elif isinstance(configs, Dict):
-            # 如果configs是单个提供商的配置，直接更新
-            self.provider_config[self.provider] = configs
-        else:
-            raise ValueError("Invalid configs format")
+                    # 单个提供商的配置，直接更新
+                    self.provider_config[self.provider] = configs
+            else:
+                raise ValueError("Invalid configs format: configs must be a dictionary")
 
         # 初始化核心组件
         self.init_providers(self.provider_config)

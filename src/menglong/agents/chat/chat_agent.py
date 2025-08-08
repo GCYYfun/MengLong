@@ -113,15 +113,10 @@ class ChatAgent(Agent):
         try:
             # 停止调度器
             if self._current_scheduler_task and not self._current_scheduler_task.done():
-                self._current_scheduler_task.cancel()
+                self.task_manager.SHUTDOWN = True
+                await asyncio.sleep(0)  # 确保调度器有时间响应
 
-            # 停止任务调度器
-            await self.task_scheduler.shutdown()
-
-            self._is_running = False
-            self._current_scheduler_task = None
-
-            return "Agent stopped successfully"
+            return "stop agent"
 
         except Exception as e:
             return f"Error stopping agent: {e}"
@@ -132,37 +127,3 @@ class ChatAgent(Agent):
         :return: 运行状态
         """
         return self._is_running
-
-    async def force_stop(self) -> str:
-        """
-        强制停止所有任务和调度器
-        :return: 停止状态信息
-        """
-        try:
-            # 强制停止调度器
-            if self._current_scheduler_task:
-                self._current_scheduler_task.cancel()
-                try:
-                    await self._current_scheduler_task
-                except asyncio.CancelledError:
-                    pass
-
-            # 强制关闭任务调度器
-            await self.task_scheduler.shutdown()
-
-            # 重置状态
-            self._is_running = False
-            self._current_scheduler_task = None
-
-            # 清理任务管理器状态
-            self.task_manager.task_descriptions.clear()
-            self.task_manager.tasks.clear()
-            self.task_manager.root_task = None
-
-            return "Agent force stopped and reset successfully"
-
-        except Exception as e:
-            # 即使出错也要重置状态
-            self._is_running = False
-            self._current_scheduler_task = None
-            return f"Agent force stopped with errors: {e}"
