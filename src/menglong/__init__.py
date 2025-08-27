@@ -7,7 +7,7 @@ MengLong Agent SDK
 __version__ = "0.1.0"
 
 from .ml_model import Model
-from .agents import ChatAgent, tool
+from .agents import TaskAgent, tool
 
 # 导出监控模块
 from .monitor import (

@@ -31,7 +31,7 @@
 # 新的模块化组件
 from ..component.tool_manager import ToolManager, ToolInfo, tool
 from .workflow_manager import WorkflowManager, WorkflowStep
-from .chat_agent import ChatAgent
+from .task_agent import TaskAgent
 from .tool import plan_task
 
 __all__ = [

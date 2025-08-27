@@ -113,7 +113,7 @@ class AwsProvider(Provider):
             response = self.client.converse(**call_param)
             return self.converter.normalize_response(response, debug=debug)
 
-    def embed(self, model_id: str, texts: [], **kwargs) -> EmbedResponse:
+    def embed(self, model_id: str, texts: list, **kwargs) -> EmbedResponse:
         """执行嵌入向量计算
 
         Args:

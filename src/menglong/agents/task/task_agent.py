@@ -6,9 +6,9 @@ from .task import Task, TaskContext, TaskScheduler, TaskManager
 from menglong.ml_model.schema.ml_request import SystemMessage as system
 
 
-class ChatAgent(Agent):
+class TaskAgent(Agent):
     """
-    ChatAgent - 用于处理聊天交互的代理
+    TaskAgent - 用于处理任务交互的代理
     """
 
     def __init__(self, model_id: str = None):
@@ -52,7 +52,7 @@ class ChatAgent(Agent):
         else:
             self.task_context.message_context[0].content = value
 
-    async def raw_chat(self, messages: list) -> str:
+    async def chat(self, messages: list) -> str:
         """
         处理原始聊天消息
         :param messages: 消息列表
@@ -61,9 +61,9 @@ class ChatAgent(Agent):
         res = self.model.chat(messages)
         return res.message.content.text
 
-    async def chat(self, task: str, tools: list = None, auto_end: bool = False) -> str:
+    async def task(self, task: str, tools: list = None, auto_end: bool = False) -> str:
         """
-        聊天方法，处理用户输入并返回响应
+        任务方法，处理用户输入并返回响应
         :param task: 用户输入的任务描述
         :param tools: 可用工具列表
         :return: 生成的响应
@@ -100,7 +100,7 @@ class ChatAgent(Agent):
         :param tools: 可用工具列表
         :return: 任务执行结果
         """
-        return await self.chat(task, tools)
+        return await self.task(task, tools)
 
     async def stop(self) -> str:
         """
