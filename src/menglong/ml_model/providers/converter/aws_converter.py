@@ -94,6 +94,18 @@ class AwsConverter(BaseConverter):
                                 logger.debug(f"工具调用 {tool_index}: {item.name}")
                             except Exception as e:
                                 logger.error(f"处理工具调用 {tool_index} 时出错: {e}")
+
+                                # 在终端输出完整的异常信息
+                                print(f"\n❌ [AWS] 异常详情:")
+                                print(f"   错误: {e}")
+                                print("   完整堆栈信息:")
+                                traceback.print_exc()
+                                print("-" * 80)
+                                print(f"\n❌ [AWS] 工具调用处理异常:")
+                                print(f"   工具索引: {tool_index}")
+                                print(f"   错误: {e}")
+                                traceback.print_exc()
+                                print("-" * 40)
                                 raise ValueError(
                                     f"AWS 工具调用格式错误 (索引 {tool_index}): {e}"
                                 )
@@ -154,6 +166,21 @@ class AwsConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"AWS 请求转换失败: {e}")
+
+            # # 在终端输出完整的异常信息
+            # print(f"\n❌ [AWS] 异常详情:")
+            # print(f"   错误: {e}")
+            # print("   完整堆栈信息:")
+            # traceback.print_exc()
+            # print("-" * 80)
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [AWS] 请求转换异常:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
+
             print_json(
                 {
                     "error": str(e),
@@ -230,6 +257,18 @@ class AwsConverter(BaseConverter):
                             logger.debug(f"工具调用 {tool_index}: {tool_desc.name}")
                         except Exception as e:
                             logger.error(f"处理工具调用 {tool_index} 时出错: {e}")
+
+                            # # 在终端输出完整的异常信息
+                            # print(f"\n❌ [AWS] 异常详情:")
+                            # print(f"   错误: {e}")
+                            # print("   完整堆栈信息:")
+                            # traceback.print_exc()
+                            # print("-" * 80)
+                            print(f"\n❌ [AWS] 响应工具调用处理异常:")
+                            print(f"   工具索引: {tool_index}")
+                            print(f"   错误: {e}")
+                            traceback.print_exc()
+                            print("-" * 40)
                             raise ValueError(
                                 f"AWS 工具调用处理错误 (索引 {tool_index}): {e}"
                             )
@@ -278,6 +317,21 @@ class AwsConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"AWS 响应标准化失败: {e}")
+
+            # # 在终端输出完整的异常信息
+            # print(f"\n❌ [AWS] 异常详情:")
+            # print(f"   错误: {e}")
+            # print("   完整堆栈信息:")
+            # traceback.print_exc()
+            # print("-" * 80)
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [AWS] 响应标准化异常:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
+
             print_json(
                 {
                     "error": str(e),
@@ -381,6 +435,18 @@ class AwsConverter(BaseConverter):
 
                 except Exception as e:
                     logger.error(f"处理 AWS 流式响应块 {chunk_count} 时出错: {e}")
+
+                    # # 在终端输出完整的异常信息
+                    # print(f"\n❌ [AWS] 异常详情:")
+                    # print(f"   错误: {e}")
+                    # print("   完整堆栈信息:")
+                    # traceback.print_exc()
+                    # print("-" * 80)
+                    print(f"\n❌ [AWS] 流式响应块处理异常:")
+                    print(f"   响应块索引: {chunk_count}")
+                    print(f"   错误: {e}")
+                    traceback.print_exc()
+                    print("-" * 40)
                     # 生成错误响应
                     error_delta = ContentDelta(text=f"错误: {str(e)}")
                     error_message = StreamMessage(
@@ -395,6 +461,21 @@ class AwsConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"AWS 流式响应处理失败: {e}")
+
+            # # 在终端输出完整的异常信息
+            # print(f"\n❌ [AWS] 异常详情:")
+            # print(f"   错误: {e}")
+            # print("   完整堆栈信息:")
+            # traceback.print_exc()
+            # print("-" * 80)
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [AWS] 流式响应处理异常:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
+
             print_json(
                 {
                     "error": str(e),
@@ -444,6 +525,18 @@ class AwsConverter(BaseConverter):
                     logger.debug(f"工具转换 {tool_index}: {tool_info.name}")
                 except Exception as e:
                     logger.error(f"转换工具 {tool_index} 时出错: {e}")
+
+                    # # 在终端输出完整的异常信息
+                    # print(f"\n❌ [AWS] 异常详情:")
+                    # print(f"   错误: {e}")
+                    # print("   完整堆栈信息:")
+                    # traceback.print_exc()
+                    # print("-" * 80)
+                    print(f"\n❌ [AWS] 工具转换异常:")
+                    print(f"   工具索引: {tool_index}")
+                    print(f"   错误: {e}")
+                    traceback.print_exc()
+                    print("-" * 40)
                     raise ValueError(f"AWS 工具转换错误 (索引 {tool_index}): {e}")
 
             logger.info(f"AWS 工具转换完成: {len(tools)} -> {len(formatted_tools)}")
@@ -451,6 +544,21 @@ class AwsConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"AWS 工具转换失败: {e}")
+
+            # # 在终端输出完整的异常信息
+            # print(f"\n❌ [AWS] 异常详情:")
+            # print(f"   错误: {e}")
+            # print("   完整堆栈信息:")
+            # traceback.print_exc()
+            # print("-" * 80)
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [AWS] 工具转换异常:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
+
             print_json(
                 {
                     "error": str(e),

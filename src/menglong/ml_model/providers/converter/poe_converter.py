@@ -69,6 +69,14 @@ class PoeConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"Poe 请求转换失败: {e}")
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [Poe] 请求转换异常:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
+
             print_json(
                 {
                     "error": str(e),
@@ -111,6 +119,14 @@ class PoeConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"Poe 响应标准化失败: {e}")
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [Poe] 响应标准化异常:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
+
             print_json(
                 {
                     "error": str(e),

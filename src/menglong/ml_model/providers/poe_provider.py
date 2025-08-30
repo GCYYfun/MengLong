@@ -1,3 +1,4 @@
+import traceback
 import fastapi_poe as fp
 import asyncio
 import os

@@ -1,3 +1,4 @@
+import traceback
 import openai
 import os
 from ..provider import Provider
@@ -54,6 +55,13 @@ class OpenaiProvider(Provider):
             )
             return self.converter.normalize_response(response)
         except Exception as e:
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [OpenAI Provider] 聊天请求异常:")
+            print(f"   模型: {model_id}")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
             raise Exception(f"An error occurred: {e}")
 
     def chat_stream(self, model_id, messages, **kwargs):

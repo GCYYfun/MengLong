@@ -191,5 +191,15 @@ class Model:
         try:
             return model_client.embed(model_id=model_id, texts=texts, **kwargs)
         except Exception as e:
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [Model] 嵌入请求异常:")
+            print(f"   模型: {model_id}")
+            print(f"   Provider: {provider}")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            import traceback
+
+            traceback.print_exc()
+            print("-" * 80)
             # 统一错误处理
             raise RuntimeError(f"Chat request failed: {str(e)}")

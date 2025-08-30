@@ -84,6 +84,13 @@ class InfinigenceConverter(BaseConverter):
                                 logger.debug(f"工具调用 {tool_index}: {item.name}")
                             except Exception as e:
                                 logger.error(f"处理工具调用 {tool_index} 时出错: {e}")
+
+                                # 在终端输出完整的异常信息
+                                print(f"\n❌ [Infinigence] 异常详情:")
+                                print(f"   错误: {e}")
+                                print("   完整堆栈信息:")
+                                traceback.print_exc()
+                                print("-" * 80)
                                 raise ValueError(
                                     f"Infinigence 工具调用格式错误 (索引 {tool_index}): {e}"
                                 )
@@ -116,6 +123,13 @@ class InfinigenceConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"Infinigence 请求转换失败: {e}")
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [Infinigence] 异常详情:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
             print_json(
                 {
                     "error": str(e),
@@ -200,6 +214,13 @@ class InfinigenceConverter(BaseConverter):
                         )
                     except Exception as e:
                         logger.error(f"处理工具调用 {tool_index} 时出错: {e}")
+
+                        # 在终端输出完整的异常信息
+                        print(f"\n❌ [Infinigence] 异常详情:")
+                        print(f"   错误: {e}")
+                        print("   完整堆栈信息:")
+                        traceback.print_exc()
+                        print("-" * 80)
                         raise ValueError(
                             f"Infinigence 工具调用处理错误 (索引 {tool_index}): {e}"
                         )
@@ -229,6 +250,13 @@ class InfinigenceConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"Infinigence 响应标准化失败: {e}")
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [Infinigence] 异常详情:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
             print_json(
                 {
                     "error": str(e),
@@ -339,6 +367,13 @@ class InfinigenceConverter(BaseConverter):
                     logger.error(
                         f"处理 Infinigence 流式响应块 {chunk_count} 时出错: {e}"
                     )
+
+                    # 在终端输出完整的异常信息
+                    print(f"\n❌ [Infinigence] 异常详情:")
+                    print(f"   错误: {e}")
+                    print("   完整堆栈信息:")
+                    traceback.print_exc()
+                    print("-" * 80)
                     # 生成错误响应
                     error_message = StreamMessage(
                         delta=ContentDelta(text_content=f"错误: {str(e)}"),
@@ -351,6 +386,13 @@ class InfinigenceConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"Infinigence 流式响应处理失败: {e}")
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [Infinigence] 异常详情:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
             print_json(
                 {
                     "error": str(e),
@@ -390,6 +432,13 @@ class InfinigenceConverter(BaseConverter):
                     logger.debug(f"工具转换 {tool_index}: {tool_info.name}")
                 except Exception as e:
                     logger.error(f"转换工具 {tool_index} 时出错: {e}")
+
+                    # 在终端输出完整的异常信息
+                    print(f"\n❌ [Infinigence] 异常详情:")
+                    print(f"   错误: {e}")
+                    print("   完整堆栈信息:")
+                    traceback.print_exc()
+                    print("-" * 80)
                     raise ValueError(
                         f"Infinigence 工具转换错误 (索引 {tool_index}): {e}"
                     )
@@ -401,6 +450,13 @@ class InfinigenceConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"Infinigence 工具转换失败: {e}")
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [Infinigence] 异常详情:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
             print_json(
                 {
                     "error": str(e),

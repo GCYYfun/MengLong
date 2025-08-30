@@ -80,6 +80,18 @@ class OpenAIConverter(BaseConverter):
                                 logger.debug(f"工具调用 {tool_index}: {item.name}")
                             except Exception as e:
                                 logger.error(f"处理工具调用 {tool_index} 时出错: {e}")
+
+                                # 在终端输出完整的异常信息
+                                print(f"\n❌ [OpenAI] 异常详情:")
+                                print(f"   错误: {e}")
+                                print("   完整堆栈信息:")
+                                traceback.print_exc()
+                                print("-" * 80)
+                                print(f"\n❌ [OpenAI] 工具调用处理异常:")
+                                print(f"   工具索引: {tool_index}")
+                                print(f"   错误: {e}")
+                                traceback.print_exc()
+                                print("-" * 40)
                                 raise ValueError(
                                     f"工具调用格式错误 (索引 {tool_index}): {e}"
                                 )
@@ -111,6 +123,21 @@ class OpenAIConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"OpenAI 请求转换失败: {e}")
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [OpenAI] 异常详情:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [OpenAI] 请求转换异常:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
+
             print_json(
                 {
                     "error": str(e),
@@ -176,6 +203,21 @@ class OpenAIConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"OpenAI 工具转换失败: {e}")
+
+            # # 在终端输出完整的异常信息
+            # print(f"\n❌ [OpenAI] 异常详情:")
+            # print(f"   错误: {e}")
+            # print("   完整堆栈信息:")
+            # traceback.print_exc()
+            # print("-" * 80)
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [OpenAI] 工具转换异常:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
+
             print_json(
                 {
                     "error": str(e),
@@ -261,6 +303,18 @@ class OpenAIConverter(BaseConverter):
                         )
                     except Exception as e:
                         logger.error(f"处理工具调用 {tool_index} 时出错: {e}")
+
+                        # # 在终端输出完整的异常信息
+                        # print(f"\n❌ [OpenAI] 异常详情:")
+                        # print(f"   错误: {e}")
+                        # print("   完整堆栈信息:")
+                        # traceback.print_exc()
+                        # print("-" * 80)
+                        print(f"\n❌ [OpenAI] 响应工具调用处理异常:")
+                        print(f"   工具索引: {tool_index}")
+                        print(f"   错误: {e}")
+                        traceback.print_exc()
+                        print("-" * 40)
                         raise ValueError(f"工具调用处理错误 (索引 {tool_index}): {e}")
 
                 message.tool_descriptions = tool_calls_list
@@ -290,6 +344,21 @@ class OpenAIConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"OpenAI 响应标准化失败: {e}")
+
+            # # 在终端输出完整的异常信息
+            # print(f"\n❌ [OpenAI] 异常详情:")
+            # print(f"   错误: {e}")
+            # print("   完整堆栈信息:")
+            # traceback.print_exc()
+            # print("-" * 80)
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [OpenAI] 响应标准化异常:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
+
             print_json(
                 {
                     "error": str(e),
@@ -381,6 +450,18 @@ class OpenAIConverter(BaseConverter):
 
                 except Exception as e:
                     logger.error(f"处理流式响应块 {chunk_count} 时出错: {e}")
+
+                    # # 在终端输出完整的异常信息
+                    # print(f"\n❌ [OpenAI] 异常详情:")
+                    # print(f"   错误: {e}")
+                    # print("   完整堆栈信息:")
+                    # traceback.print_exc()
+                    # print("-" * 80)
+                    print(f"\n❌ [OpenAI] 流式响应块处理异常:")
+                    print(f"   响应块索引: {chunk_count}")
+                    print(f"   错误: {e}")
+                    traceback.print_exc()
+                    print("-" * 40)
                     yield {"type": "error", "error": str(e), "chunk_index": chunk_count}
                     continue
 
@@ -388,6 +469,21 @@ class OpenAIConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"OpenAI 流式响应处理失败: {e}")
+
+            # # 在终端输出完整的异常信息
+            # print(f"\n❌ [OpenAI] 异常详情:")
+            # print(f"   错误: {e}")
+            # print("   完整堆栈信息:")
+            # traceback.print_exc()
+            # print("-" * 80)
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [OpenAI] 流式响应处理异常:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
+
             print_json(
                 {
                     "error": str(e),

@@ -80,6 +80,13 @@ class OpenSourceConverter(BaseConverter):
                                 logger.debug(f"工具调用 {tool_index}: {item.name}")
                             except Exception as e:
                                 logger.error(f"处理工具调用 {tool_index} 时出错: {e}")
+
+                                # 在终端输出完整的异常信息
+                                print(f"\n❌ [OpenSource] 异常详情:")
+                                print(f"   错误: {e}")
+                                print("   完整堆栈信息:")
+                                traceback.print_exc()
+                                print("-" * 80)
                                 raise ValueError(
                                     f"OpenSource 工具调用格式错误 (索引 {tool_index}): {e}"
                                 )
@@ -111,6 +118,13 @@ class OpenSourceConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"OpenSource 请求转换失败: {e}")
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [OpenSource] 异常详情:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
             print_json(
                 {
                     "error": str(e),
@@ -198,6 +212,13 @@ class OpenSourceConverter(BaseConverter):
                         )
                     except Exception as e:
                         logger.error(f"处理工具调用 {tool_index} 时出错: {e}")
+
+                        # 在终端输出完整的异常信息
+                        print(f"\n❌ [OpenSource] 异常详情:")
+                        print(f"   错误: {e}")
+                        print("   完整堆栈信息:")
+                        traceback.print_exc()
+                        print("-" * 80)
                         raise ValueError(
                             f"OpenSource 工具调用处理错误 (索引 {tool_index}): {e}"
                         )
@@ -229,6 +250,13 @@ class OpenSourceConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"OpenSource 响应标准化失败: {e}")
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [OpenSource] 异常详情:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
             print_json(
                 {
                     "error": str(e),
@@ -322,6 +350,13 @@ class OpenSourceConverter(BaseConverter):
                     logger.error(
                         f"处理 OpenSource 流式响应块 {chunk_count} 时出错: {e}"
                     )
+
+                    # 在终端输出完整的异常信息
+                    print(f"\n❌ [OpenSource] 异常详情:")
+                    print(f"   错误: {e}")
+                    print("   完整堆栈信息:")
+                    traceback.print_exc()
+                    print("-" * 80)
                     yield {"type": "error", "error": str(e), "chunk_index": chunk_count}
                     continue
 
@@ -329,6 +364,13 @@ class OpenSourceConverter(BaseConverter):
 
         except Exception as e:
             logger.error(f"OpenSource 流式响应处理失败: {e}")
+
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [OpenSource] 异常详情:")
+            print(f"   错误: {e}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
             print_json(
                 {
                     "error": str(e),

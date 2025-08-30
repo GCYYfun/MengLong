@@ -93,6 +93,14 @@ def trace_converter_method(func):
             logger.error(f"错误消息: {error_msg}")
             logger.error(f"错误堆栈: {error_trace}")
 
+            # 在终端输出完整的异常信息
+            print(f"\n❌ [{cls_name}] 转换器异常详情:")
+            print(f"   方法: {operation_name}")
+            print(f"   错误: {error_type}: {error_msg}")
+            print("   完整堆栈信息:")
+            traceback.print_exc()
+            print("-" * 80)
+
             # 记录工具调用错误
             log_tool_call(
                 tool_name=operation_name,
