@@ -3,7 +3,7 @@
 """
 
 from .base_converter import BaseConverter
-
+from .aws_converter import AwsConverter
 from .poe_converter import PoeConverter
 from .deepseek_converter import DeepseekConverter
 from .openai_converter import OpenAIConverter
@@ -12,6 +12,7 @@ from .osoai_converter import OpenSourceConverter
 
 __all__ = [
     "BaseConverter",
+    "AwsConverter",
     "PoeConverter",
     "DeepseekConverter",
     "OpenAIConverter",

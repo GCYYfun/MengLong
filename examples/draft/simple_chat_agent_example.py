@@ -4,7 +4,7 @@
 这个文件展示了如何使用新的模块化聊天代理组件
 """
 
-from menglong.agents.chat import SimpleChatAgent, ChatMode, tool
+from menglong.agents.task import SimpleChatAgent, ChatMode, tool
 
 
 # 示例1：定义工具

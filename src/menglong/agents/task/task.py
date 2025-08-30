@@ -369,14 +369,27 @@ class TaskManager:
 
     def _build_tools_dict(self, tools: List[Any]) -> Dict[str, Dict[str, Any]]:
         """构建工具字典"""
-        return {
-            tool._tool_info.name: {
-                "function": tool._tool_info.func,
-                "description": tool._tool_info.description,
-                "parameters": tool._tool_info.parameters,
-            }
-            for tool in tools
-        }
+        tools_dict = {}
+        for tool in tools:
+            # 检查是否是绑定方法（实例方法）
+            if hasattr(tool, "__self__") and hasattr(tool, "_tool_info"):
+                # 这是一个绑定的实例方法，使用绑定方法本身
+                tools_dict[tool._tool_info.name] = {
+                    "function": tool,  # 使用绑定方法
+                    "description": tool._tool_info.description,
+                    "parameters": tool._tool_info.parameters,
+                }
+            elif hasattr(tool, "_tool_info"):
+                # 这是一个普通的装饰过的函数
+                tools_dict[tool._tool_info.name] = {
+                    "function": tool._tool_info.func,
+                    "description": tool._tool_info.description,
+                    "parameters": tool._tool_info.parameters,
+                }
+            else:
+                print(f"Warning: Tool {tool} does not have _tool_info attribute")
+
+        return tools_dict
 
     async def _execute_plan_task_tool(
         self,
@@ -421,11 +434,13 @@ class TaskManager:
         else:
             result = tool_func(**arguments)
 
-        return (
+        r = (
             json.dumps(result, ensure_ascii=False)
             if isinstance(result, dict)
             else str(result)
         )
+        print(r, type(r))
+        return r
 
     def parse_task_plan(self, current_task_id: int, task_plan: Dict[str, Any]) -> None:
         """解析任务计划并创建子任务

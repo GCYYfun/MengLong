@@ -14,7 +14,7 @@ ChatAgent.run() 实用演示
 日期: 2025年6月12日
 """
 
-from menglong.agents.chat.chat_agent import ChatAgent, ChatMode, tool
+from menglong.agents.task.task_agent import ChatAgent, ChatMode, tool
 from menglong.utils.log import rich_print, rich_print_rule, RichMessageType
 import time
 import random

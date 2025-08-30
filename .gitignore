@@ -14,3 +14,8 @@ wheels/
 *.DS_Store
 archive/
 experience.yaml
+
+# 暂时忽略
+/tests
+/docs
+/examples

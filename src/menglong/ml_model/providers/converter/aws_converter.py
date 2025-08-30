@@ -2,6 +2,7 @@
 AWS API 转换器实现。
 """
 
+import traceback
 from typing import Any, Generator, List, Dict, Tuple, Union
 from ...schema.ml_request import (
     SystemMessage,
@@ -19,7 +20,8 @@ from ...schema.ml_response import (
     StreamMessage,
     ChatStreamResponse,
 )
-from .base_converter import BaseConverter
+from .base_converter import BaseConverter, trace_converter_method
+from ....utils.log import get_logger, print_json
 
 from ....utils.log import print_json
 
@@ -33,6 +35,7 @@ class AwsConverter(BaseConverter):
     tool = False
 
     @staticmethod
+    @trace_converter_method
     def convert_request_messages(
         messages: List[Any],
     ) -> List[Any]:
@@ -45,242 +48,416 @@ class AwsConverter(BaseConverter):
         Returns:
             转换后的消息列表
         """
-        # print("messages:", messages)  # for debug
+        logger = get_logger("converter.aws")
+
+        # 验证输入
+        messages = BaseConverter._validate_input_messages(
+            messages, "AWS.convert_request_messages"
+        )
+
         system_messages = []
         prompt_messages = []
-        for message in messages:
-            if isinstance(message, SystemMessage):
-                system_messages.append({"text": message.content})
-            elif isinstance(message, UserMessage):
-                prompt_messages.append(
-                    {"role": message.role, "content": [{"text": message.content}]}
-                )
-            elif isinstance(message, AssistantMessage):
-                prompt_messages.append(
-                    {"role": message.role, "content": [{"text": message.content}]}
-                )
-            elif isinstance(message, Message):
-                # 处理助手消息的列表内容
-                content = []
-                if message.content.text is not None:
-                    content.append({"text": message.content.text})
-                if message.tool_descriptions is not None:
-                    for item in message.tool_descriptions:
-                        content.append(
-                            {
-                                "toolUse": {
-                                    "toolUseId": item.id,
-                                    "name": item.name,
-                                    "input": item.arguments,
-                                }
-                            }
-                        )
-                prompt_messages.append({"role": "assistant", "content": content})
-            elif isinstance(message, ToolMessage):
-                # Handle ToolMessage for tool results
-                # 检查之前是否有工具调用结果消息被添加，如果没有则，添加一个工具结果
-                # 如果有，则将其追加到现有的工具结果中
-                if "toolResult" not in prompt_messages[-1].get("content")[0]:
+
+        try:
+            for index, message in enumerate(messages):
+                logger.debug(f"处理 AWS 消息 {index}: {type(message).__name__}")
+
+                if isinstance(message, SystemMessage):
+                    system_messages.append({"text": message.content})
+                elif isinstance(message, UserMessage):
                     prompt_messages.append(
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "toolResult": {
-                                        "toolUseId": message.tool_id,
-                                        "content": [{"text": message.content}],
+                        {"role": message.role, "content": [{"text": message.content}]}
+                    )
+                elif isinstance(message, AssistantMessage):
+                    prompt_messages.append(
+                        {"role": message.role, "content": [{"text": message.content}]}
+                    )
+                elif isinstance(message, Message):
+                    # 处理助手消息的列表内容
+                    content = []
+                    if message.content.text is not None:
+                        content.append({"text": message.content.text})
+                    if message.tool_descriptions is not None:
+                        logger.debug(
+                            f"消息 {index} 包含 {len(message.tool_descriptions)} 个工具调用"
+                        )
+                        for tool_index, item in enumerate(message.tool_descriptions):
+                            try:
+                                tool_use = {
+                                    "toolUse": {
+                                        "toolUseId": item.id,
+                                        "name": item.name,
+                                        "input": item.arguments,
                                     }
                                 }
-                            ],
-                        }
-                    )
-                else:
-                    prompt_messages[-1]["content"].append(
-                        {
-                            "toolResult": {
-                                "toolUseId": message.tool_id,
-                                "content": [{"text": message.content}],
-                            }
-                        }
-                    )
-            elif isinstance(message, dict):
-                # 处理原始字典消息
-                if "role" in message and "content" in message:
-                    role = message["role"]
-                    content = message["content"]
-                    if role == "system":
-                        system_messages.append({"text": content})
-                    else:
+                                content.append(tool_use)
+                                logger.debug(f"工具调用 {tool_index}: {item.name}")
+                            except Exception as e:
+                                logger.error(f"处理工具调用 {tool_index} 时出错: {e}")
+                                raise ValueError(
+                                    f"AWS 工具调用格式错误 (索引 {tool_index}): {e}"
+                                )
+                    prompt_messages.append({"role": "assistant", "content": content})
+                elif isinstance(message, ToolMessage):
+                    # Handle ToolMessage for tool results
+                    # 检查之前是否有工具调用结果消息被添加，如果没有则，添加一个工具结果
+                    # 如果有，则将其追加到现有的工具结果中
+                    if (
+                        not prompt_messages
+                        or "toolResult"
+                        not in prompt_messages[-1].get("content", [{}])[0]
+                    ):
                         prompt_messages.append(
-                            {"role": role, "content": [{"text": content}]}
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "toolResult": {
+                                            "toolUseId": message.tool_id,
+                                            "content": [{"text": message.content}],
+                                        }
+                                    }
+                                ],
+                            }
                         )
-            else:
-                raise ValueError(f"Unsupported message type: {type(message)}")
-        return system_messages, prompt_messages
+                    else:
+                        prompt_messages[-1]["content"].append(
+                            {
+                                "toolResult": {
+                                    "toolUseId": message.tool_id,
+                                    "content": [{"text": message.content}],
+                                }
+                            }
+                        )
+                    logger.debug(f"工具结果消息 {index}: {message.tool_id}")
+                elif isinstance(message, dict):
+                    # 处理原始字典消息
+                    if "role" in message and "content" in message:
+                        role = message["role"]
+                        content = message["content"]
+                        if role == "system":
+                            system_messages.append({"text": content})
+                        else:
+                            prompt_messages.append(
+                                {"role": role, "content": [{"text": content}]}
+                            )
+                        logger.debug(f"字典消息 {index}: {role}")
+                else:
+                    error_msg = f"不支持的消息类型 (索引 {index}): {type(message)}"
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
+
+            logger.info(
+                f"AWS 请求转换完成: {len(messages)} -> 系统消息 {len(system_messages)}, 提示消息 {len(prompt_messages)}"
+            )
+            return system_messages, prompt_messages
+
+        except Exception as e:
+            logger.error(f"AWS 请求转换失败: {e}")
+            print_json(
+                {
+                    "error": str(e),
+                    "input_message_count": len(messages),
+                    "system_messages_count": len(system_messages),
+                    "prompt_messages_count": len(prompt_messages),
+                    "error_trace": traceback.format_exc(),
+                },
+                title="AWS 请求转换错误详情",
+            )
+            raise
 
     @staticmethod
+    @trace_converter_method
     def normalize_response(response, debug=False) -> ChatResponse:
         """将AWS响应标准化为MLong的响应格式。"""
-        if debug:
-            # 如果需要调试输出，可以取消注释以下行
-            print_json(
-                response,
-                title="aws response",
-            )  # for debug
-        output = response.get("output")
-        content = Content(text=None)
-        # message = Message(content=content, finish_reason=response["stopReason"])
-        if AwsConverter.reasoning:  # 纯推理
-            content.reasoning = output["message"]["content"][0]["reasoningContent"][
-                "reasoningText"
-            ]["text"]
-            content.text = output["message"]["content"][1]["text"]
-            message = Message(
-                content=content,
-                finish_reason=response["stopReason"],
+        logger = get_logger("converter.aws")
+
+        # 验证响应
+        response = BaseConverter._validate_response(response, "AWS.normalize_response")
+
+        try:
+            if debug:
+                print_json(response, title="AWS 响应详情")
+
+            logger.debug(f"开始处理 AWS 响应，响应类型: {type(response).__name__}")
+
+            # 检查响应结构
+            if "output" not in response:
+                error_msg = "AWS 响应缺少 output 字段"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+            output = response.get("output")
+            if not output or "message" not in output:
+                error_msg = "AWS 响应的 output 缺少 message 字段"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+            content = Content(text=None)
+
+            try:
+                if AwsConverter.reasoning:  # 纯推理
+                    logger.debug("处理推理响应")
+                    content.reasoning = output["message"]["content"][0][
+                        "reasoningContent"
+                    ]["reasoningText"]["text"]
+                    content.text = output["message"]["content"][1]["text"]
+                    message = Message(
+                        content=content,
+                        finish_reason=response["stopReason"],
+                    )
+                elif response["stopReason"] == "tool_use":
+                    logger.debug("处理工具使用响应")
+                    index = 0
+                    if "text" in output["message"]["content"][index]:
+                        content.text = output["message"]["content"][index]["text"]
+                        index += 1
+
+                    # 处理工具调用
+                    tool_items = output["message"]["content"][index:]
+                    logger.debug(f"响应包含 {len(tool_items)} 个工具调用")
+
+                    descriptions = []
+                    for tool_index, item in enumerate(tool_items):
+                        try:
+                            tool_desc = ToolDesc(
+                                id=item["toolUse"]["toolUseId"],
+                                type="tool_use",
+                                name=item["toolUse"]["name"],
+                                arguments=item["toolUse"]["input"],
+                            )
+                            descriptions.append(tool_desc)
+                            logger.debug(f"工具调用 {tool_index}: {tool_desc.name}")
+                        except Exception as e:
+                            logger.error(f"处理工具调用 {tool_index} 时出错: {e}")
+                            raise ValueError(
+                                f"AWS 工具调用处理错误 (索引 {tool_index}): {e}"
+                            )
+
+                    message = Message(
+                        content=content,
+                        finish_reason=response["stopReason"],
+                        tool_descriptions=descriptions,
+                    )
+                else:
+                    logger.debug("处理普通文本响应")
+                    if not output["message"]["content"]:
+                        logger.warning("响应内容为空")
+                        content.text = ""
+                    else:
+                        content.text = output["message"]["content"][0]["text"]
+                    message = Message(
+                        content=content,
+                        finish_reason=response["stopReason"],
+                    )
+            except (KeyError, IndexError, TypeError) as e:
+                logger.error(f"解析 AWS 响应内容时出错: {e}")
+                raise ValueError(f"AWS 响应格式错误: {e}")
+
+            # 处理使用情况
+            usage_data = response.get("usage", {})
+            usage = Usage(
+                input_tokens=usage_data.get("inputTokens", 0),
+                output_tokens=usage_data.get("outputTokens", 0),
+                total_tokens=usage_data.get("totalTokens", 0),
             )
-        elif response["stopReason"] == "tool_use":
-            index = 0
-            if "text" in output["message"]["content"][index]:
-                content.text = output["message"]["content"][index]["text"]
-                index += 1
-            descriptions = [
-                ToolDesc(
-                    id=item["toolUse"]["toolUseId"],
-                    type="tool_use",
-                    name=item["toolUse"]["name"],
-                    arguments=item["toolUse"]["input"],
+
+            if usage.total_tokens > 0:
+                logger.debug(
+                    f"Token 使用: 输入={usage.input_tokens}, 输出={usage.output_tokens}, 总计={usage.total_tokens}"
                 )
-                for item in output["message"]["content"][index:]
-            ]
-            message = Message(
-                content=content,
-                finish_reason=response["stopReason"],
-                tool_descriptions=descriptions,
-            )
-        else:
-            content.text = output["message"]["content"][0]["text"]
-            message = Message(
-                content=content,
-                finish_reason=response["stopReason"],
+            else:
+                logger.warning("响应中缺少使用情况信息")
+
+            mlong_response = ChatResponse(
+                message=message, model=response.get("modelId", "unknown"), usage=usage
             )
 
-        usage = Usage(
-            input_tokens=response.get("usage", {}).get("inputTokens", 0),
-            output_tokens=response.get("usage", {}).get("outputTokens", 0),
-            total_tokens=response.get("usage", {}).get("totalTokens", 0),
-        )
+            logger.info("AWS 响应标准化完成")
+            return mlong_response
 
-        mlong_response = ChatResponse(
-            message=message, model=response.get("modelId"), usage=usage
-        )
-        return mlong_response
+        except Exception as e:
+            logger.error(f"AWS 响应标准化失败: {e}")
+            print_json(
+                {
+                    "error": str(e),
+                    "response_keys": (
+                        list(response.keys())
+                        if isinstance(response, dict)
+                        else "non-dict"
+                    ),
+                    "has_output": (
+                        "output" in response if isinstance(response, dict) else False
+                    ),
+                    "stop_reason": (
+                        response.get("stopReason")
+                        if isinstance(response, dict)
+                        else "unknown"
+                    ),
+                    "error_trace": traceback.format_exc(),
+                },
+                title="AWS 响应标准化错误详情",
+            )
+            raise
 
     @staticmethod
+    @trace_converter_method
     def normalize_stream_response(
         response_stream,
         debug: bool = False,
     ) -> Generator:
         """将AWS流式响应标准化为MLong的响应格式。"""
-        # 返回生成器
-        for chunk in response_stream.get("stream", []):
-            # 处理流式响应
-            delta = ContentDelta()
-            start = None
-            finish = None
-            usage = None
-            if debug:
-                # 如果需要调试输出，可以取消注释以下行
-                print_json(
-                    chunk,
-                    title="aws chunk",
-                )
-            # for debug
-            # print(chunk)
-            # 处理不同类型的消息
-            match chunk:
-                case {"contentBlockDelta": block}:
-                    # 处理文本内容
-                    if block.get("delta").get("text") is not None:
-                        delta.text = block.get("delta").get("text")
-                    # 处理推理内容
-                    if block.get("delta").get("reasoningContent") is not None:
-                        delta.reasoning = (
-                            block.get("delta").get("reasoningContent").get("text")
-                        )
-                    # # 处理工具调用
-                    # if block.get("delta").get("toolResult") is not None:
-                    #     delta.tool_result = block.get("delta").get("toolResult")
-                    #     delta.tool_result.tool_use_id = (
-                    #         block.get("delta").get("toolResult").get("toolUseId")
-                    #     )
-                case {"messageStart": message_start}:
-                    # 处理推理内容
-                    start = message_start.get("role")
-                    pass
-                case {"contentBlockStop": content_stop}:
-                    # 处理内容块停止
-                    content_stop_index = content_stop.get("contentBlockIndex")
-                    finish = f"{content_stop_index}"
-                case {"messageStop": message_stop}:
-                    if message_stop.get("stopReason") == "end_turn":
-                        finish = "end_turn"
-                case {"metadata": metadata}:
-                    # 处理元数据
-                    usage = Usage(
-                        input_tokens=metadata.get("usage").get("inputTokens", 0),
-                        output_tokens=metadata.get("usage").get("outputTokens", 0),
-                        total_tokens=metadata.get("usage").get("totalTokens", 0),
+        logger = get_logger("converter.aws")
+        logger.debug("开始处理 AWS 流式响应")
+
+        chunk_count = 0
+
+        try:
+            # 返回生成器
+            for chunk in response_stream.get("stream", []):
+                chunk_count += 1
+                logger.debug(f"处理 AWS 流式响应块 {chunk_count}")
+
+                try:
+                    # 处理流式响应
+                    delta = ContentDelta()
+                    start = None
+                    finish = None
+                    usage = None
+
+                    if debug:
+                        print_json(chunk, title=f"AWS 响应块 {chunk_count}")
+
+                    # 处理不同类型的消息
+                    match chunk:
+                        case {"contentBlockDelta": block}:
+                            # 处理文本内容
+                            if block.get("delta").get("text") is not None:
+                                delta.text = block.get("delta").get("text")
+                                logger.debug(f"响应块 {chunk_count}: 文本内容")
+                            # 处理推理内容
+                            if block.get("delta").get("reasoningContent") is not None:
+                                delta.reasoning = (
+                                    block.get("delta")
+                                    .get("reasoningContent")
+                                    .get("text")
+                                )
+                                logger.debug(f"响应块 {chunk_count}: 推理内容")
+                        case {"messageStart": message_start}:
+                            # 处理推理内容
+                            start = message_start.get("role")
+                            logger.debug(f"响应块 {chunk_count}: 消息开始 ({start})")
+                        case {"contentBlockStop": content_stop}:
+                            # 处理内容块停止
+                            content_stop_index = content_stop.get("contentBlockIndex")
+                            finish = f"{content_stop_index}"
+                            logger.debug(f"响应块 {chunk_count}: 内容块停止 ({finish})")
+                        case {"messageStop": message_stop}:
+                            if message_stop.get("stopReason") == "end_turn":
+                                finish = "end_turn"
+                                logger.debug(f"响应块 {chunk_count}: 消息停止")
+                        case {"metadata": metadata}:
+                            # 处理元数据
+                            usage_data = metadata.get("usage", {})
+                            usage = Usage(
+                                input_tokens=usage_data.get("inputTokens", 0),
+                                output_tokens=usage_data.get("outputTokens", 0),
+                                total_tokens=usage_data.get("totalTokens", 0),
+                            )
+                            logger.debug(
+                                f"响应块 {chunk_count}: 元数据 (Token 使用: {usage.total_tokens})"
+                            )
+                        case _:
+                            logger.debug(f"响应块 {chunk_count}: 未知类型")
+
+                    message = StreamMessage(
+                        delta=delta,
+                        start_reason=start,
+                        finish_reason=finish,
                     )
-                case _:
-                    pass
+                    yield ChatStreamResponse(
+                        message=message, model_id=None, usage=usage
+                    )
 
-            # if AwsConverter.reasoning:
-            #     delta = ContentDelta(
-            #         text_content=chunk.get("content"),
-            #         reasoning_content=chunk.get("reasoningContent"),
-            #     )
-            # else:
+                except Exception as e:
+                    logger.error(f"处理 AWS 流式响应块 {chunk_count} 时出错: {e}")
+                    # 生成错误响应
+                    error_delta = ContentDelta(text=f"错误: {str(e)}")
+                    error_message = StreamMessage(
+                        delta=error_delta, finish_reason="error"
+                    )
+                    yield ChatStreamResponse(
+                        message=error_message, model_id=None, usage=None
+                    )
+                    continue
 
-            #     delta = ContentDelta(
-            #         text_content=chunk.get("contentBlockDelta")
-            #         .get("delta")
-            #         .get("text"),
-            #         reasoning_content=None,
-            #     )
-            message = StreamMessage(
-                delta=delta,
-                start_reason=start,
-                finish_reason=finish,
+            logger.info(f"AWS 流式响应处理完成，共处理 {chunk_count} 个响应块")
+
+        except Exception as e:
+            logger.error(f"AWS 流式响应处理失败: {e}")
+            print_json(
+                {
+                    "error": str(e),
+                    "processed_chunks": chunk_count,
+                    "debug": debug,
+                    "error_trace": traceback.format_exc(),
+                },
+                title="AWS 流式响应处理错误详情",
             )
-            yield ChatStreamResponse(message=message, model_id=None, usage=usage)
+            raise
 
     @staticmethod
+    @trace_converter_method
     def convert_tools(tools: List, model_id: str) -> List[Dict]:
         """将工具转换为适合模型的格式。"""
+        logger = get_logger("converter.aws")
+
         if not tools:
+            logger.debug("没有工具需要转换")
             return []
 
-        formatted_tools = []
-        for tool in tools:
-            tool_info = tool._tool_info
-            match model_id:
-                case model_id if "claude" in model_id:
-                    formatted_tool = {
-                        "toolSpec": {
-                            "name": tool_info.name,
-                            "description": tool_info.description,
-                            "inputSchema": {"json": tool_info.parameters},
-                        }
-                    }
-                case _:
-                    formatted_tool = {
-                        "toolSpec": {
-                            "name": tool_info.name,
-                            "description": tool_info.description,
-                            "inputSchema": {"json": tool_info.parameters},
-                        }
-                    }
-            formatted_tools.append(formatted_tool)
+        try:
+            formatted_tools = []
+            logger.debug(f"开始转换 {len(tools)} 个工具，模型: {model_id}")
 
-        return formatted_tools
+            for tool_index, tool in enumerate(tools):
+                try:
+                    tool_info = tool._tool_info
+                    match model_id:
+                        case model_id if "claude" in model_id:
+                            formatted_tool = {
+                                "toolSpec": {
+                                    "name": tool_info.name,
+                                    "description": tool_info.description,
+                                    "inputSchema": {"json": tool_info.parameters},
+                                }
+                            }
+                        case _:
+                            formatted_tool = {
+                                "toolSpec": {
+                                    "name": tool_info.name,
+                                    "description": tool_info.description,
+                                    "inputSchema": {"json": tool_info.parameters},
+                                }
+                            }
+                    formatted_tools.append(formatted_tool)
+                    logger.debug(f"工具转换 {tool_index}: {tool_info.name}")
+                except Exception as e:
+                    logger.error(f"转换工具 {tool_index} 时出错: {e}")
+                    raise ValueError(f"AWS 工具转换错误 (索引 {tool_index}): {e}")
+
+            logger.info(f"AWS 工具转换完成: {len(tools)} -> {len(formatted_tools)}")
+            return formatted_tools
+
+        except Exception as e:
+            logger.error(f"AWS 工具转换失败: {e}")
+            print_json(
+                {
+                    "error": str(e),
+                    "tools_count": len(tools) if tools else 0,
+                    "model_id": model_id,
+                    "error_trace": traceback.format_exc(),
+                },
+                title="AWS 工具转换错误详情",
+            )
+            raise

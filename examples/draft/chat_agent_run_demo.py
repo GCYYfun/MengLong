@@ -16,7 +16,7 @@ import time
 import random
 from typing import Dict, Any, List
 
-from menglong.agents.chat.chat_agent import ChatAgent, ChatMode, tool
+from menglong.agents.task.task_agent import ChatAgent, ChatMode, tool
 from menglong.utils.log import (
     rich_print,
     rich_print_rule,

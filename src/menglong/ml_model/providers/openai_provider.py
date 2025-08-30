@@ -40,6 +40,11 @@ class OpenaiProvider(Provider):
         # Any exception raised by OpenAI will be returned to the caller.
         # Maybe we should catch them and raise a custom LLMError.
         messages = self.converter.convert_request(messages)
+
+        # 处理工具参数
+        if "tools" in kwargs:
+            kwargs["tools"] = self.converter.convert_tools(kwargs["tools"])
+
         try:
             # format_messages = self.converter.convert_request(messages)
             response = self.client.chat.completions.create(
@@ -49,7 +54,7 @@ class OpenaiProvider(Provider):
             )
             return self.converter.normalize_response(response)
         except Exception as e:
-            raise f"An error occurred: {e}"
+            raise Exception(f"An error occurred: {e}")
 
     def chat_stream(self, model_id, messages, **kwargs):
         """

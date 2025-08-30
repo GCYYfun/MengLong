@@ -15,7 +15,7 @@ ChatAgent Demo - 演示 ChatAgent 的不同模式功能
 import asyncio
 import json
 from typing import Dict, Any
-from menglong.agents.chat.chat_agent import ChatAgent, ChatMode
+from menglong.agents.task.task_agent import ChatAgent, ChatMode
 from menglong.ml_model import Model
 from menglong.utils.log import (
     rich_print,

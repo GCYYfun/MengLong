@@ -1,5 +1,5 @@
 import asyncio
-from task_agent import ChatAgent
+from menglong.agents.task.task_agent import ChatAgent
 from tool import (
     terminal_command,
     plan_task,

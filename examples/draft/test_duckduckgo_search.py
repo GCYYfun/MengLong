@@ -8,7 +8,7 @@ import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from menglong.agents.chat.chat_agent import ChatAgent, ChatMode, tool
+from menglong.agents.task.task_agent import ChatAgent, ChatMode, tool
 from menglong.utils.log import rich_print, RichMessageType
 import time
 from typing import Dict, Any

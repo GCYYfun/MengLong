@@ -85,7 +85,16 @@ class AwsProvider(Provider):
             if key in self.inference_parameters:
                 inference_config[key] = value
             elif key == "tools":
-                tool_config[key] = self.converter.convert_tools(value, model_id)
+                tool_config["tools"] = self.converter.convert_tools(value, model_id)
+            elif key == "tool_choice":
+                # AWS 工具选择格式
+                if value == "auto":
+                    tool_config["toolChoice"] = {"auto": {}}
+                elif value == "none":
+                    tool_config["toolChoice"] = {"none": {}}
+                elif isinstance(value, dict):
+                    tool_config["toolChoice"] = value
+                # 忽略其他值，使用默认
             else:
                 additional_model_request_fields[key] = value
 

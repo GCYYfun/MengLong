@@ -283,7 +283,7 @@ class ToolManager:
                 tool_info = tool._tool_info
                 if isinstance(tool_info, ToolInfo):
                     self.tools[tool_info.name] = {
-                        "function": tool_info.func,
+                        "function": tool,  # 使用传入的 tool 而不是 tool_info.func，保持绑定关系
                         "description": tool_info.description,
                         "parameters": tool_info.parameters,
                     }
@@ -310,7 +310,7 @@ class ToolManager:
             if hasattr(func, "_is_tool") and hasattr(func, "_tool_info"):
                 tool_info = func._tool_info
                 self.tools[tool_info.name] = {
-                    "function": tool_info.func,
+                    "function": func,  # 使用传入的 func 而不是 tool_info.func，保持绑定关系
                     "description": tool_info.description,
                     "parameters": tool_info.parameters,
                 }
@@ -320,7 +320,7 @@ class ToolManager:
         tools = get_tools_from_module(module_or_namespace)
         for tool_name, tool_info in tools.items():
             self.tools[tool_name] = {
-                "function": tool_info.func,
+                "function": tool_info.func,  # 对于模块函数，使用原始函数是正确的
                 "description": tool_info.description,
                 "parameters": tool_info.parameters,
             }
@@ -330,7 +330,7 @@ class ToolManager:
         global_tools = get_global_tools()
         for tool_name, tool_info in global_tools.items():
             self.tools[tool_name] = {
-                "function": tool_info.func,
+                "function": tool_info.func,  # 对于全局函数，使用原始函数是正确的
                 "description": tool_info.description,
                 "parameters": tool_info.parameters,
             }
@@ -348,7 +348,7 @@ class ToolManager:
                     if tool_name in global_tools:
                         tool_info = global_tools[tool_name]
                         self.tools[tool_name] = {
-                            "function": tool_info.func,
+                            "function": tool_info.func,  # 对于按名称注册的全局工具，使用原始函数
                             "description": tool_info.description,
                             "parameters": tool_info.parameters,
                         }

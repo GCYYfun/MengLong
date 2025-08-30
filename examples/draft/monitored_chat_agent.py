@@ -7,7 +7,7 @@
 
 import time
 from typing import Dict, Any, Optional
-from menglong.agents.chat import SimpleChatAgent, ChatMode
+from menglong.agents.task import SimpleChatAgent, ChatMode
 from menglong.monitor import (
     enable_monitoring,
     MonitorCategory,

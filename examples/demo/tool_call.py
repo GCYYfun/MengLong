@@ -336,7 +336,7 @@ def aws_anthropic_tool_call_demo():
         messages=messages,
         temperature=0.5,
         maxTokens=1000,
-        tools=[weather_tool_aws],
+        tools=[get_weather],
         tool_choice={"type": "any"},
     )
 
@@ -373,7 +373,7 @@ def aws_anthropic_tool_call_demo():
         print_message("step2")
         print_message(messages, title="Messages after tool call")
         # Get the final response from the model
-        final_response = model.chat(messages=messages, tools=[weather_tool_aws])
+        final_response = model.chat(messages=messages, tools=[get_weather])
         print_message("Final Response:")
         print_message(final_response.message.content.text)
     else:
@@ -397,12 +397,12 @@ def main():
     # logger.info("开始 DeepSeek 工具调用演示")
     # deepseek_tool_call_demo()
 
-    # print_rule("AWS Demo", style="magenta")
-    # logger.info("开始 AWS 工具调用演示")
-    # aws_anthropic_tool_call_demo()
+    print_rule("AWS Demo", style="magenta")
+    logger.info("开始 AWS 工具调用演示")
+    aws_anthropic_tool_call_demo()
 
-    logger.info("开始 Infinigence 工具调用演示")
-    infinigence_tool_call_demo()
+    # logger.info("开始 Infinigence 工具调用演示")
+    # infinigence_tool_call_demo()
 
     logger.info("工具调用演示完成")
     print_message("Tool Call Demo completed.", MessageType.SUCCESS, title="Completed")
