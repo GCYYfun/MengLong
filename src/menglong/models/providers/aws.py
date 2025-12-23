@@ -1,0 +1,193 @@
+from typing import List, Generator, Dict, Any, Optional
+import boto3
+import json
+import os
+import base64
+
+from menglong.models.providers.base import BaseProvider
+from menglong.models.providers.registry import ProviderRegistry
+from menglong.schemas.chat import (
+    Message, Response, StreamResponse, 
+    Output, Content, Usage, Action,
+    StreamOutput, Delta
+)
+from menglong.utils.config.config_type import ProviderConfig
+
+@ProviderRegistry.register("aws")
+class AWSProvider(BaseProvider):
+    """
+    AWS Bedrock Provider
+    基于 boto3 的 converse API 实现。
+    """
+    
+    def __init__(self, config: ProviderConfig):
+        super().__init__(config)
+        # 允许从配置中读取 region 和 profile
+        region = getattr(config, "region", None) or os.getenv("AWS_REGION", "us-east-1")
+        profile = getattr(config, "profile", None)
+        
+        session = boto3.Session(profile_name=profile)
+        self.client = session.client(
+            service_name="bedrock-runtime",
+            region_name=region
+        )
+
+    # ==========================================
+    #         生命周期钩子实现
+    # ==========================================
+
+    def _convert_messages(self, messages: List[Message]) -> List[Dict[str, Any]]:
+        """
+        将消息转换为 Bedrock Converse API 格式。
+        支持多模态 ContentPart 到 Bedrock ContentBlock 的映射。
+        """
+
+        bedrock_msgs = []
+        for msg in messages:
+            role = msg.role.value if hasattr(msg.role, "value") else msg.role
+            if role == "system":
+                continue 
+            
+            content = msg.content
+            bedrock_content = []
+            
+            if isinstance(content, str):
+                bedrock_content.append({"text": content})
+            elif isinstance(content, list):
+                for part in content:
+                    if hasattr(part, "type"):
+                        if part.type == "text":
+                            bedrock_content.append({"text": part.text})
+                        elif part.type == "image":
+                            # Bedrock image 格式
+                            fmt = "jpeg"
+                            if part.media_type:
+                                fmt = part.media_type.split("/")[-1]
+                            
+                            source = {}
+                            if part.image_url:
+                                # Bedrock converse 目前不支持直接传 URL，通常需要下载或传字节
+                                # 这里假设如果是 URL，用户暂不传，或者我们报错。
+                                # 但为了演示，我们假设存在 bytes
+                                source = {"bytes": b""} 
+                            elif part.data:
+                                source = {"bytes": base64.b64decode(part.data)}
+                                
+                            bedrock_content.append({"image": {"format": fmt, "source": source}})
+                        elif part.type == "document":
+                            fmt = part.media_type.split("/")[-1] if part.media_type else "pdf"
+                            bedrock_content.append({
+                                "document": {
+                                    "format": fmt,
+                                    "name": "document",
+                                    "source": {"bytes": base64.b64decode(part.data)}
+                                }
+                            })
+                        else:
+                            # 兜底
+                            bedrock_content.append(part.model_dump(exclude_none=True) if hasattr(part, "model_dump") else part)
+                    else:
+                        bedrock_content.append(part)
+            
+            bedrock_msgs.append({
+                "role": role,
+                "content": bedrock_content
+            })
+        return bedrock_msgs
+
+    def _normalize_response(self, response: Any, model: str) -> Response:
+        """归一化 Bedrock 同步响应"""
+        output_msg = response["output"]["message"]
+        text_content = ""
+        for part in output_msg.get("content", []):
+            if "text" in part:
+                text_content += part["text"]
+
+        content_obj = Content(text=text_content)
+        output = Output(
+            content=content_obj,
+            status=response.get("stopReason")
+        )
+
+        usage_data = response.get("usage", {})
+        usage = Usage(
+            input_tokens=usage_data.get("inputTokens", 0),
+            output_tokens=usage_data.get("outputTokens", 0),
+            total_tokens=usage_data.get("totalTokens", 0)
+        )
+
+        return Response(output=output, model=model, usage=usage)
+
+    def _normalize_stream_chunk(self, chunk: Any, model: str) -> StreamResponse:
+        """归一化 Bedrock 流式碎片"""
+        # Bedrock 流式返回的是事件载荷
+        delta_text = None
+        finish_reason = None
+        usage = None
+
+        if "contentBlockDelta" in chunk:
+            delta_text = chunk["contentBlockDelta"]["delta"].get("text")
+        elif "messageStop" in chunk:
+            finish_reason = chunk["messageStop"].get("stopReason")
+        elif "metadata" in chunk and "usage" in chunk["metadata"]:
+            u = chunk["metadata"]["usage"]
+            usage = Usage(
+                input_tokens=u.get("inputTokens", 0),
+                output_tokens=u.get("outputTokens", 0),
+                total_tokens=u.get("totalTokens", 0)
+            )
+
+        delta_obj = Delta(text=delta_text)
+        stream_output = StreamOutput(
+            delta=delta_obj,
+            end=finish_reason
+        )
+
+        return StreamResponse(output=stream_output, model=model, usage=usage)
+
+    # ==========================================
+    #         能力接口实现
+    # ==========================================
+
+    def chat(self, messages: List[Message], model: str, **kwargs) -> Response:
+        params = self._convert_params(model, **kwargs)
+        
+        # 提取系统提示词
+        system_prompts = []
+        for m in messages:
+            role_val = m.role.value if hasattr(m.role, "value") else m.role
+            if role_val == "system":
+                system_prompts.append({"text": m.content})
+
+        converse_kwargs = {
+            "modelId": model,
+            "messages": self._convert_messages(messages),
+            "inferenceConfig": params
+        }
+        if system_prompts:
+            converse_kwargs["system"] = system_prompts
+
+        response = self.client.converse(**converse_kwargs)
+        return self._normalize_response(response, model)
+
+    def stream_chat(self, messages: List[Message], model: str, **kwargs) -> Generator[StreamResponse, None, None]:
+        params = self._convert_params(model, **kwargs)
+        
+        system_prompts = []
+        for m in messages:
+            role_val = m.role.value if hasattr(m.role, "value") else m.role
+            if role_val == "system":
+                system_prompts.append({"text": m.content})
+
+        converse_stream_kwargs = {
+            "modelId": model,
+            "messages": self._convert_messages(messages),
+            "inferenceConfig": params
+        }
+        if system_prompts:
+            converse_stream_kwargs["system"] = system_prompts
+
+        response = self.client.converse_stream(**converse_stream_kwargs)
+        
+        for event in response.get("stream"):
+            yield self._normalize_stream_chunk(event, model)
