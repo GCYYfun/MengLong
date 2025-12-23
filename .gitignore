@@ -12,3 +12,10 @@ wheels/
 # config
 .configs.toml
 *.DS_Store
+
+draft
+src_old
+examples/
+src/old_menglong_v2
+*key.json
+*.py

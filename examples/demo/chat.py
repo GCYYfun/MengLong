@@ -3,17 +3,9 @@
 示例脚本，演示如何使用MengLong Agent SDK。
 """
 
-import menglong as ml
-from menglong.ml_model import Model
-from menglong.ml_model.schema import user
-from menglong.utils.log import (
-    rich_print,
-    rich_print_rule,
-    rich_print_stream,
-    RichMessageType,
-    configure_logger,
-    get_logger,
-)
+import menglong as mlong
+from menglong import Model
+from menglong.schema import user
 
 
 # normal chat
@@ -29,21 +21,16 @@ def normal_chat(model: Model):
     Args:
         model (Model): 模型实例
     """
-    rich_print_rule("Normal Chat", style="green")
-    rich_print("正在向模型发送请求...", RichMessageType.INFO)
+    print("Normal Chat")
+    print("正在向模型发送请求...")
     # 创建模型实例
     response = model.chat(
         messages=[user(content="你好,你是谁？简单回复一下")],
     )
     # 打印模型响应
-    rich_print(
-        response,
-        RichMessageType.AGENT,
-        title="AI Assistant",
-        subtitle=model.model_id,
-        use_panel=True,
-    )
-    return response
+    print("模型响应：", response)
+    print("-" * 40)
+    print(response.text)
 
 
 def thinking_chat(model: Model):
@@ -52,15 +39,15 @@ def thinking_chat(model: Model):
     Args:
         model (Model): 模型实例
     """
-    rich_print_rule("Thinking Chat", style="green")
-    rich_print("正在向模型发送请求...", RichMessageType.INFO)
+    print("Thinking Chat")
+    print("正在向模型发送请求...")
     # 创建模型实例
     response = model.chat(
         messages=[user(content="你好,你是谁？简单回复一下")],
-        thinking={"budget_tokens": 2048, "type": "enabled"},
+        # thinking={"budget_tokens": 2048, "type": "enabled"},
     )
     # 打印模型响应
-    rich_print(response, RichMessageType.AGENT, title="AI Assistant", use_panel=True)
+    print(response)
     return response
 
 
@@ -70,8 +57,8 @@ def streaming_chat(model: Model):
     Args:
         model (Model): 模型实例
     """
-    rich_print_rule("Streaming Chat", style="green")
-    rich_print("正在向模型发送请求...", RichMessageType.INFO)
+    print("Streaming Chat")
+    print("正在向模型发送请求...")
     # 创建模型实例
     res = model.chat(
         messages=[user(content="你好,你是谁？简单回复一下")],
@@ -86,17 +73,18 @@ def streaming_chat(model: Model):
             # rich_print_stream(
             #     chunk, RichMessageType.AGENT, title="AI Assistant", use_panel=True
             # )
-            if chunk.message.delta.text:
-                rich_print(chunk.message.delta.text, end="")
-            elif chunk.message.delta.reasoning:
-                rich_print(chunk.message.delta.reasoning, end="")
-            elif chunk.message.start_reason:
-                rich_print("--")
-            elif chunk.message.finish_reason:
-                if chunk.message.finish_reason == "stop":
-                    rich_print("\n--")
-                if chunk.message.finish_reason == "0":
-                    rich_print("\n--")
+            if chunk.output.delta.text:
+                print(chunk.output.delta.text, end="")
+            elif chunk.output.delta.reasoning:
+                print(chunk.output.delta.reasoning, end="")
+            elif chunk.output.start:
+                print("--")
+            elif chunk.output.end:
+                print("\nchunk.output.end\n")
+                # if chunk.output.end == "stop":
+                #     print("\n--")
+                # if chunk.output.end == "0":
+                #     print("\n--")
 
     rich_print_stream_response(res)
 
@@ -110,7 +98,7 @@ def main():
     # logger.debug("初始化模型...")
 
     model = Model(
-        model_id="deepseek-r1",
+        "gpt-5.1",
     )
 
     normal_chat(model)

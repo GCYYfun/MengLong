@@ -1,1 +1,1 @@
-"""Utils package for menglong."""
+from .config import load_config

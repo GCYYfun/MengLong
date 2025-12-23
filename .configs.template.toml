@@ -1,0 +1,114 @@
+# MengLong 配置模板文件
+# 分层配置架构
+
+# 全局默认配置
+[default]
+model_id = "deepseek/deepseek-chat"  # provider/model 格式
+embedding_model_id = "openai/text-embedding-3-small"
+rerank_model_id = ""
+temperature = 0.7
+max_tokens = 4096
+timeout = 30
+
+# Provider 配置层
+[providers]
+
+  # OpenAI Provider 配置
+  [providers.openai]
+  api_key = ""
+  base_url = "https://api.openai.com/v1"
+  timeout = 30
+  max_retries = 3
+  
+    # OpenAI 模型配置
+    [providers.openai.models]
+      [providers.openai.models.gpt-5]
+      temperature = 0.7
+      max_tokens = 4096
+      
+      [providers.openai.models.gpt-4o]
+      temperature = 0.7
+      max_tokens = 4096
+      
+      [providers.openai.models.text-embedding-3-small]
+      dimensions = 1536
+
+  # DeepSeek Provider 配置
+  [providers.deepseek]
+  api_key = ""
+  base_url = "https://api.deepseek.com"
+  timeout = 30
+  max_retries = 3
+  
+    # DeepSeek 模型配置
+    [providers.deepseek.models]
+      [providers.deepseek.models.deepseek-chat]
+      temperature = 0.8
+      max_tokens = 8192
+      
+      [providers.deepseek.models.deepseek-reasoner]
+      temperature = 1.0
+      max_tokens = 8192
+
+  # AWS Provider 配置
+  [providers.aws]
+  region_name = ""
+  aws_access_key_id = ""
+  aws_secret_access_key = ""
+  timeout = 30
+  max_retries = 3
+  
+    # AWS 模型配置
+    [providers.aws.models]
+      [providers.aws.models."us.anthropic.claude-3-7-sonnet-20250219-v1:0"]
+      temperature = 0.7
+      max_tokens = 4096
+
+  # Google Provider 配置
+  [providers.google]
+  api_key = ""
+  timeout = 30
+  max_retries = 3
+  
+    # Google 模型配置
+    [providers.google.models]
+      [providers.google.models.gemini-pro]
+      temperature = 0.7
+      max_tokens = 4096
+
+  # Anthropic Provider 配置
+  [providers.anthropic]
+  api_key = ""
+  base_url = "https://api.anthropic.com"
+  timeout = 30
+  max_retries = 3
+  
+    # Anthropic 模型配置
+    [providers.anthropic.models]
+      [providers.anthropic.models.claude-4.5-sonnet]
+      temperature = 0.7
+      max_tokens = 4096
+
+  # Infinigence Provider 配置
+  [providers.infinigence]
+  api_key = ""
+  timeout = 30
+  max_retries = 3
+  
+    # Infinigence 模型配置
+    [providers.infinigence.models]
+      [providers.infinigence.models.step-1v]
+      temperature = 0.7
+      max_tokens = 4096
+
+# 系统配置层
+[system]
+debug = false
+log_level = "INFO"
+
+# 监控配置层
+[monitoring]
+enabled = true
+level = "INFO"
+categories = ["MODEL_INTERACTION", "TOOL_CALLS"]
+output_file = ""
