@@ -48,6 +48,10 @@ class AWSProvider(BaseProvider):
             if role == "system":
                 continue 
             
+            # Bedrock 不支持 tool 角色，工具结果必须放在 user 角色中
+            if role == "tool":
+                role = "user"
+            
             content = msg.content
             bedrock_content = []
             
@@ -83,6 +87,33 @@ class AWSProvider(BaseProvider):
                                     "source": {"bytes": base64.b64decode(part.data)}
                                 }
                             })
+                        elif part.type == "action":
+                            bedrock_content.append({
+                                "toolUse": {
+                                    "toolUseId": part.id,
+                                    "name": part.name,
+                                    "input": part.arguments
+                                }
+                            })
+                        elif part.type == "outcome":
+                            # Bedrock 要求 toolResult 的 content.json 必须是对象
+                            res = part.result
+                            if isinstance(res, str):
+                                try:
+                                    res = json.loads(res)
+                                except:
+                                    pass
+                            
+                            if not isinstance(res, dict):
+                                res = {"result": res}
+
+                            bedrock_content.append({
+                                "toolResult": {
+                                    "toolUseId": part.id,
+                                    "content": [{"json": res}],
+                                    # "status": "error" if part.is_error else "success"
+                                }
+                            })
                         else:
                             # 兜底
                             bedrock_content.append(part.model_dump(exclude_none=True) if hasattr(part, "model_dump") else part)
@@ -99,13 +130,22 @@ class AWSProvider(BaseProvider):
         """归一化 Bedrock 同步响应"""
         output_msg = response["output"]["message"]
         text_content = ""
+        actions = []
         for part in output_msg.get("content", []):
             if "text" in part:
                 text_content += part["text"]
+            elif "toolUse" in part:
+                tu = part["toolUse"]
+                actions.append(Action(
+                    id=tu.get("toolUseId"),
+                    name=tu.get("name"),
+                    arguments=tu.get("input")
+                ))
 
-        content_obj = Content(text=text_content)
+        content_obj = Content(text=text_content if text_content else None)
         output = Output(
             content=content_obj,
+            actions=actions if actions else None,
             status=response.get("stopReason")
         )
 
@@ -145,6 +185,30 @@ class AWSProvider(BaseProvider):
 
         return StreamResponse(output=stream_output, model=model, usage=usage)
 
+    def _convert_tools(self, tools: List[Any]) -> Dict[str, Any]:
+        """将标准化工具转换为 AWS Bedrock toolConfig 格式"""
+        aws_tools = []
+        for t in tools:
+            if hasattr(t, "function"):
+                aws_tools.append({
+                    'toolSpec': {
+                        'name': t.function.name,
+                        'description': t.function.description,
+                        'inputSchema': {'json': t.function.parameters}
+                    }
+                })
+            elif isinstance(t, dict) and "function" in t:
+                aws_tools.append({
+                    'toolSpec': {
+                        'name': t["function"]["name"],
+                        'description': t["function"]["description"],
+                        'inputSchema': {'json': t["function"]["parameters"]}
+                    }
+                })
+            else:
+                aws_tools.append(t)
+        return {'tools': aws_tools}
+
     # ==========================================
     #         能力接口实现
     # ==========================================
@@ -152,6 +216,10 @@ class AWSProvider(BaseProvider):
     def chat(self, messages: List[Message], model: str, **kwargs) -> Response:
         params = self._convert_params(model, **kwargs)
         
+        tool_config = None
+        if "tools" in params:
+             tool_config = self._convert_tools(params.pop("tools"))
+
         # 提取系统提示词
         system_prompts = []
         for m in messages:
@@ -166,13 +234,20 @@ class AWSProvider(BaseProvider):
         }
         if system_prompts:
             converse_kwargs["system"] = system_prompts
+        if tool_config:
+            converse_kwargs["toolConfig"] = tool_config
 
         response = self.client.converse(**converse_kwargs)
         return self._normalize_response(response, model)
 
     def stream_chat(self, messages: List[Message], model: str, **kwargs) -> Generator[StreamResponse, None, None]:
         params = self._convert_params(model, **kwargs)
-        
+
+        tool_config = None
+        if "tools" in params:
+             tool_config = self._convert_tools(params.pop("tools"))
+
+        # 提取系统提示词
         system_prompts = []
         for m in messages:
             role_val = m.role.value if hasattr(m.role, "value") else m.role
@@ -186,6 +261,8 @@ class AWSProvider(BaseProvider):
         }
         if system_prompts:
             converse_stream_kwargs["system"] = system_prompts
+        if tool_config:
+            converse_stream_kwargs["toolConfig"] = tool_config
 
         response = self.client.converse_stream(**converse_stream_kwargs)
         

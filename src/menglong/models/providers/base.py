@@ -40,6 +40,11 @@ class BaseProvider(ABC):
         """[由外向内]：将供应商流式碎片归一化为 SDK 内部 StreamResponse 对象"""
         pass
 
+    @abstractmethod
+    def _convert_tools(self, tools: List[Any]) -> Any:
+        """[由内向外]：将标准化工具列表转换为供应商特定格式"""
+        pass
+
     def _convert_params(self, model: str, **kwargs) -> Dict[str, Any]:
         """
         [由内向外]：统一转换控制参数。

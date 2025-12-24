@@ -81,6 +81,27 @@ class GoogleProvider(BaseProvider):
                                 google_parts.append(types.Part.from_bytes(data=base64.b64decode(part.data), mime_type=part.media_type or "image/jpeg"))
                         elif part.type == "document":
                             google_parts.append(types.Part.from_bytes(data=base64.b64decode(part.data), mime_type=part.media_type or "application/pdf"))
+                        elif part.type == "action":
+                            google_parts.append(types.Part(function_call=types.FunctionCall(
+                                name=part.name,
+                                args=part.arguments)
+                            ,thought_signature=part.id))
+                        elif part.type == "outcome":
+                            # Google 要求 function_response 的 response 必须是字典
+                            res = part.result
+                            if isinstance(res, str):
+                                try:
+                                    res = json.loads(res)
+                                except:
+                                    pass
+                            
+                            if not isinstance(res, dict):
+                                res = {"result": res}
+                                
+                            google_parts.append(types.Part.from_function_response(
+                                name=part.name,
+                                response=res
+                            ))
                         else:
                             # 兜底转换
                             google_parts.append(types.Part(text=str(part)))
@@ -99,12 +120,26 @@ class GoogleProvider(BaseProvider):
 
     def _normalize_response(self, response: Any, model: str) -> Response:
         """归一化 Google GenAI 同步响应"""
-        # response 是 GenerateContentResponse
-        text_content = response.text
+        text_content = ""
+        actions = []
         
-        content_obj = Content(text=text_content)
+        if response.candidates:
+            candidate = response.candidates[0]
+            if candidate.content and candidate.content.parts:
+                for part in candidate.content.parts:
+                    if hasattr(part, "text") and part.text:
+                        text_content += part.text
+                    elif hasattr(part, "function_call") and part.function_call:
+                        actions.append(Action(
+                            id=part.thought_signature,
+                            name=part.function_call.name,
+                            arguments=part.function_call.args,
+                        ))
+
+        content_obj = Content(text=text_content if text_content else None)
         output = Output(
             content=content_obj,
+            actions=actions if actions else None,
             status=str(response.candidates[0].finish_reason) if response.candidates else None
         )
 
@@ -143,6 +178,39 @@ class GoogleProvider(BaseProvider):
 
         return StreamResponse(output=stream_output, model=model, usage=usage)
 
+    def _convert_tools(self, tools: List[Any]) -> List[types.Tool]:
+        """将标准化工具转换为 Google GenAI 格式"""
+        functions = []
+        for t in tools:
+            if hasattr(t, "function"):
+                functions.append(types.FunctionDeclaration(
+                    name=t.function.name,
+                    description=t.function.description,
+                    parameters=t.function.parameters
+                ))
+            elif isinstance(t, dict) and "function" in t:
+                functions.append(types.FunctionDeclaration(
+                    name=t["function"]["name"],
+                    description=t["function"]["description"],
+                    parameters=t["function"]["parameters"]
+                ))
+            else:
+                # Fallback for other tool types if any, or raise error
+                # For now, assuming only function declarations are converted this way
+                # and other tool types (if any) would be handled differently or passed through.
+                # The original code had `other_tools.append(t)` for non-function tools.
+                # This simplified version assumes all tools here are function-like.
+                # If `t` is already a `types.Tool` or `types.FunctionDeclaration`, it will be appended directly.
+                functions.append(t)
+        
+        # If there are function declarations, wrap them in a single Tool object.
+        # The original code created a list of tools, where one item could be Tool(function_declarations=decls)
+        # and others could be raw tools. This simplified version assumes all tools passed to _convert_tools
+        # are meant to be function declarations.
+        if functions:
+            return [types.Tool(function_declarations=functions)]
+        return []
+
     # ==========================================
     #         能力接口实现
     # ==========================================
@@ -157,20 +225,49 @@ class GoogleProvider(BaseProvider):
             if role_val == "system":
                 system_instruction = m.content
                 break
+        
+        if system_instruction:
+            params["system_instruction"] = system_instruction
+
+        if "tools" in params:
+             params["tools"] = self._convert_tools(params["tools"])
 
         response = self.client.models.generate_content(
             model=model,
             contents=self._convert_messages(messages),
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                **params
-            )
+            config=types.GenerateContentConfig(**params)
         )
         return self._normalize_response(response, model)
 
     def stream_chat(self, messages: List[Message], model: str, **kwargs) -> Generator[StreamResponse, None, None]:
         params = self._convert_params(model, **kwargs)
         
+        # 处理工具转换 (MengLong Standard -> Google GenAI Spec)
+        google_tools = None
+        if "tools" in params:
+            decls = []
+            other_tools = []
+            for t in params.pop("tools"):
+                if hasattr(t, "function"):
+                    decls.append(types.FunctionDeclaration(
+                        name=t.function.name,
+                        description=t.function.description,
+                        parameters=t.function.parameters
+                    ))
+                elif isinstance(t, dict) and "function" in t:
+                    decls.append(types.FunctionDeclaration(
+                        name=t["function"]["name"],
+                        description=t["function"]["description"],
+                        parameters=t["function"]["parameters"]
+                    ))
+                else:
+                    other_tools.append(t)
+            
+            google_tools = []
+            if decls:
+                google_tools.append(types.Tool(function_declarations=decls))
+            google_tools.extend(other_tools)
+
         system_instruction = None
         for m in messages:
             role_val = m.role.value if hasattr(m.role, "value") else m.role
@@ -183,6 +280,7 @@ class GoogleProvider(BaseProvider):
             contents=self._convert_messages(messages),
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
+                tools=google_tools,
                 **params
             )
         )

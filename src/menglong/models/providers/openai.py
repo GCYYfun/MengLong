@@ -1,30 +1,30 @@
-from typing import List, Generator, Dict, Any, Optional
-import os
-import openai
 import json
+from typing import List, Generator, Dict, Any, Optional
 
 from menglong.models.providers.base import BaseProvider
 from menglong.models.providers.registry import ProviderRegistry
 from menglong.schemas.chat import (
     Message, Response, StreamResponse, 
     Output, Content, Usage, Action,
-    StreamOutput, Delta, MessageRole
+    StreamOutput, Delta
 )
-from menglong.schemas.embedding import EmbedResponse
 from menglong.utils.config.config_type import ProviderConfig
 
 @ProviderRegistry.register("openai")
 class OpenAIProvider(BaseProvider):
-    
+    """
+    OpenAI Provider 适配器。
+    实现 BaseProvider 协议，对接 OpenAI Chat Completions API。
+    """
+
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
-        api_key = config.api_key or os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OpenAI API key is missing.")
-            
+        import openai
+        
+        # 支持通过配置指定 api_key 和 base_url
         self.client = openai.OpenAI(
-            api_key=api_key,
-            base_url=config.base_url or "https://api.openai.com/v1"
+            api_key=config.api_key,
+            base_url=config.base_url
         )
 
     # ==========================================
@@ -42,35 +42,71 @@ class OpenAIProvider(BaseProvider):
                 # 转换 ContentPart 列表为 OpenAI 格式
                 serialized_content = []
                 for part in content:
-                    if hasattr(part, "type"):
-                        # 处理特定类型映射
-                        if part.type == "text":
-                            serialized_content.append({"type": "text", "text": part.text})
-                        elif part.type == "image":
-                            # OpenAI 格式: {"type": "image_url", "image_url": {"url": "..."}}
-                            img_data = {}
-                            if part.image_url:
-                                img_data = {"url": part.image_url.get("url", "")}
-                            elif part.data:
-                                # 处理 Base64
-                                mime = part.media_type or "image/jpeg"
-                                img_data = {"url": f"data:{mime};base64,{part.data}"}
-                            serialized_content.append({"type": "image_url", "image_url": img_data})
-                        else:
-                            # 兜底转换
-                            serialized_content.append(part.model_dump(exclude_none=True) if hasattr(part, "model_dump") else part)
+                    part_type = getattr(part, "type", None) or (part.get("type") if isinstance(part, dict) else None)
+                    
+                    if part_type == "text":
+                        serialized_content.append({"type": "text", "text": getattr(part, "text", "")})
+                    elif part_type == "image":
+                        # OpenAI 格式: {"type": "image_url", "image_url": {"url": "..."}}
+                        img_data = {}
+                        if getattr(part, "image_url", None):
+                            img_data = {"url": part.image_url.get("url", "")}
+                        elif getattr(part, "data", None):
+                            # 处理 Base64
+                            mime = getattr(part, "media_type", "image/jpeg")
+                            img_data = {"url": f"data:{mime};base64,{part.data}"}
+                        serialized_content.append({"type": "image_url", "image_url": img_data})
+                    elif part_type == "action" or part_type == "outcome":
+                        # OpenAI 不允许工具调用出现在 content 列表中
+                        continue
+                    elif hasattr(part, "model_dump"):
+                        serialized_content.append(part.model_dump(exclude_none=True))
                     else:
                         serialized_content.append(part)
                 content = serialized_content
+
+            # 处理 Tool 角色消息 (OpenAI 要求 content 必须是字符串，且包含 tool_call_id)
+            if role_val == "tool":
+                if isinstance(msg.content, list):
+                    # 提取 ToolResultPart 内容
+                    text_parts = []
+                    for part in msg.content:
+                        if hasattr(part, "result"):
+                            text_parts.append(str(part.result))
+                        elif isinstance(part, dict):
+                            text_parts.append(str(part.get("result", "")))
+                    content = "\n".join(text_parts)
+                else:
+                    content = str(msg.content)
 
             m = {
                 "role": role_val,
                 "content": content
             }
-            if msg.name:
-                m["name"] = msg.name
             if msg.tool_id:
                 m["tool_call_id"] = msg.tool_id
+            
+            # 处理 Assistant 的 tool_calls 字段
+            if role_val == "assistant" and isinstance(msg.content, list):
+                tool_calls = []
+                for part in msg.content:
+                    part_type = getattr(part, "type", None) or (part.get("type") if isinstance(part, dict) else None)
+                    if part_type == "action":
+                        tool_calls.append({
+                            "id": getattr(part, "id", ""),
+                            "type": "function",
+                            "function": {
+                                "name": getattr(part, "name", ""),
+                                "arguments": json.dumps(part.arguments) if isinstance(getattr(part, "arguments", None), dict) else getattr(part, "arguments", "{}")
+                            }
+                        })
+                if tool_calls:
+                    m["tool_calls"] = tool_calls
+                    # 如果只有工具调用，content 应为 None
+                    has_text = any(isinstance(p, dict) and p.get("type") == "text" for p in content) if isinstance(content, list) else False
+                    if not has_text:
+                        m["content"] = None
+
             openai_msgs.append(m)
         return openai_msgs
 
@@ -89,11 +125,14 @@ class OpenAIProvider(BaseProvider):
                     args = {"raw": tc.function.arguments} 
                 actions.append(Action(id=tc.id, name=tc.function.name, arguments=args))
 
-        # 构造统一输出
-        content_obj = Content(text=choice.message.content, reasoning=None)
-        output = Output(content=content_obj, actions=actions, status=choice.finish_reason)
+        content_obj = Content(text=choice.message.content)
 
-        # 构造 Usage
+        output = Output(
+            content=content_obj,
+            actions=actions,
+            status=choice.finish_reason
+        )
+
         usage = None
         if response.usage:
             usage = Usage(
@@ -125,8 +164,19 @@ class OpenAIProvider(BaseProvider):
                 output_tokens=chunk.usage.completion_tokens,
                 total_tokens=chunk.usage.total_tokens
             )
-
+        
         return StreamResponse(output=stream_output, model=chunk.model, usage=usage)
+
+    def _convert_tools(self, tools: List[Any]) -> List[Dict[str, Any]]:
+        """将标准化工具转换为 OpenAI 格式"""
+        openai_tools = []
+        for t in tools:
+            if hasattr(t, "model_dump"):
+                # 如果是 ToolInfo 对象，确保输出 type="function" (DeepSeek 需要)
+                openai_tools.append(t.model_dump(exclude_none=True))
+            else:
+                openai_tools.append(t)
+        return openai_tools
 
     # ==========================================
     #         能力接口实现
@@ -135,6 +185,9 @@ class OpenAIProvider(BaseProvider):
     def chat(self, messages: List[Message], model: str, **kwargs) -> Response:
         params = self._convert_params(model, **kwargs)
         
+        if "tools" in params:
+            params["tools"] = self._convert_tools(params["tools"])
+
         response = self.client.chat.completions.create(
             model=model,
             messages=self._convert_messages(messages),
@@ -145,6 +198,9 @@ class OpenAIProvider(BaseProvider):
     def stream_chat(self, messages: List[Message], model: str, **kwargs) -> Generator[StreamResponse, None, None]:
         params = self._convert_params(model, **kwargs)
         
+        if "tools" in params:
+            params["tools"] = self._convert_tools(params["tools"])
+
         stream = self.client.chat.completions.create(
             model=model,
             messages=self._convert_messages(messages),
@@ -153,18 +209,3 @@ class OpenAIProvider(BaseProvider):
         )
         for chunk in stream:
             yield self._normalize_stream_chunk(chunk, model)
-
-    def embed(self, texts: List[str], model: str, **kwargs) -> EmbedResponse:
-        response = self.client.embeddings.create(
-            input=texts,
-            model=model,
-            **kwargs
-        )
-        
-        embeddings = [item.embedding for item in response.data]
-        return EmbedResponse(
-            embeddings=embeddings,
-            texts=texts,
-            model=model,
-            usage=response.usage.model_dump() if hasattr(response.usage, "model_dump") else response.usage
-        )

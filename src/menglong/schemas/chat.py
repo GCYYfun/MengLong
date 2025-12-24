@@ -42,41 +42,27 @@ class DocumentPart(ContentPart):
     data: str # Base64
     media_type: str = "application/pdf"
 
-class ToolCallPart(ContentPart):
-    """工具调用片段"""
-    type: str = "tool_use"
-    id: str
-    name: str
-    arguments: Dict[str, Any]
-
-class ToolResultPart(ContentPart):
-    """工具结果片段"""
-    type: str = "tool_result"
-    tool_use_id: str
-    content: Optional[str] = None
-    is_error: bool = False
-
-
-class Action(BaseModel):
+class Action(ContentPart):
     """动作描述 (用于 Response 输出)"""
-    id: str = ""
+    type: str = "action"
+    id: Any = None
     name: str = ""
     arguments: Optional[Dict[str, Any]] = None
 
 
-class Outcome(BaseModel):
+class Outcome(ContentPart):
     """工具处理结果 (用于 Request 输入)"""
-    id: str
+    type: str = "outcome"
+    id: Any
+    name: Optional[str] = None
     result: str
-
 
 class Message(BaseModel):
     """聊天消息"""
     role: MessageRole
     content: Optional[Union[str, List[Union[ContentPart, Dict[str, Any]]]]] = None
-    outcomes: Optional[List[Outcome]] = None
-    name: Optional[str] = None
-    tool_id: Optional[str] = None
+    # outcomes: Optional[List[Outcome]] = None
+    tool_id: Any = None
 
     model_config = ConfigDict(use_enum_values=True)
 
@@ -177,7 +163,7 @@ def Assistant(content: Optional[str] = None, tool_calls: Optional[List[Dict]] = 
         parts.append(TextPart(text=content))
     
     for tc in tool_calls:
-        parts.append(ToolCallPart(
+        parts.append(Action(
             id=tc.get("id", ""),
             name=tc.get("name", ""),
             arguments=tc.get("arguments", {})
@@ -188,13 +174,21 @@ def System(content: str) -> Message:
     """快捷构造 System 消息"""
     return Message(role=MessageRole.SYSTEM, content=content)
 
-def Tool(tool_id: str, content: str, **kwargs) -> Message:
+def Tool(tool_id: Any, content: str, **kwargs) -> Message:
     """
     快捷构造 Tool 结果消息。
     部分 Provider 内部会将其映射为 user 或特定 role。
     """
-    parts = [ToolResultPart(tool_use_id=tool_id, content=content, is_error=kwargs.get("is_error", False))]
-    return Message(role=MessageRole.TOOL, content=parts, tool_id=tool_id)
+    parts = [Outcome(
+        id=tool_id, 
+        name=kwargs.get("name"), 
+        result=content, 
+    )]
+    return Message(
+        role=MessageRole.TOOL, 
+        content=parts, 
+        tool_id=tool_id,
+    )
 
 
 # =========================
@@ -226,6 +220,11 @@ class Response(BaseModel):
     @property
     def text(self) -> Optional[str]:
         return self.output.content.text if self.output and self.output.content else None
+
+    @property
+    def tool_calls(self) -> Optional[List[Action]]:
+        """快捷获取工具调用列表 (Alias for output.actions)"""
+        return self.output.actions if self.output else None
 
 
 # ======== 流式响应模型 ========

@@ -6,7 +6,7 @@ from menglong.models.providers.base import BaseProvider
 from menglong.models.providers.registry import ProviderRegistry
 from menglong.schemas.chat import (
     Message, Response, StreamResponse, 
-    Output, Content, Usage, 
+    Output, Content, Usage, Action,
     StreamOutput, Delta
 )
 from menglong.utils.config.config_type import ProviderConfig
@@ -78,12 +78,51 @@ class AnthropicProvider(BaseProvider):
             if role_val == "system":
                 continue
             
+            # Anthropic 不支持 tool 角色，工具结果必须放在 user 角色中
+            if role_val == "tool":
+                role_val = "user"
+            
             content = msg.content
             if isinstance(content, list):
-                # 序列化 ContentPart
                 serialized_content = []
                 for part in content:
-                    if hasattr(part, "model_dump"):
+                    # part_type = getattr(part, "type", None) or (part.get("type") if isinstance(part, dict) else None)
+                    
+                    if part.type == "text":
+                        serialized_content.append({"type": "text", "text": part.text})
+                    elif part.type == "image":
+                        if part.image_url:
+                            serialized_content.append({
+                                "type": "image",
+                                "source": {
+                                    "type": "url",
+                                    "url": part.image_url.get("url", "")
+                                }
+                            })
+                        elif part.data:
+                            serialized_content.append({
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": part.media_type or "image/jpeg",
+                                    "data": part.data
+                                }
+                            })
+                    elif part.type == "action":
+                        serialized_content.append({
+                            "type": "tool_use",
+                            "id": part.id,
+                            "name": part.name,
+                            "input": part.arguments
+                        })
+                    elif part.type == "outcome":
+                        serialized_content.append({
+                            "type": "tool_result",
+                            "tool_use_id": part.id,
+                            "content": part.result,
+                            # "is_error": part.is_error
+                        })
+                    elif hasattr(part, "model_dump"):
                         serialized_content.append(part.model_dump(exclude_none=True))
                     else:
                         serialized_content.append(part)
@@ -98,15 +137,30 @@ class AnthropicProvider(BaseProvider):
     def _normalize_response(self, response: Any, model: str) -> Response:
         """归一化响应（Native 与 Bedrock SDK 返回的消息对象结构一致）"""
         text_content = ""
+        actions = []
         for block in response.content:
             if hasattr(block, "text"):
                 text_content += block.text
-            elif isinstance(block, dict) and "text" in block:
-                text_content += block["text"]
+            elif hasattr(block, "type") and block.type == "tool_use":
+                actions.append(Action(
+                    id=block.id,
+                    name=block.name,
+                    arguments=block.input
+                ))
+            elif isinstance(block, dict):
+                if block.get("type") == "text":
+                    text_content += block.get("text", "")
+                elif block.get("type") == "tool_use":
+                    actions.append(Action(
+                        id=block.get("id"),
+                        name=block.get("name"),
+                        arguments=block.get("input")
+                    ))
 
-        content_obj = Content(text=text_content)
+        content_obj = Content(text=text_content if text_content else None)
         output = Output(
             content=content_obj,
+            actions=actions if actions else None,
             status=getattr(response, "stop_reason", None)
         )
 
@@ -146,6 +200,20 @@ class AnthropicProvider(BaseProvider):
         stream_output = StreamOutput(delta=delta_obj, end=finish_reason)
         return StreamResponse(output=stream_output, model=model, usage=usage)
 
+    def _convert_tools(self, tools: List[Any]) -> List[Dict[str, Any]]:
+        """将标准化工具转换为 Anthropic 格式"""
+        anthropic_tools = []
+        for t in tools:
+            if hasattr(t, "function"):
+                anthropic_tools.append({
+                    "name": t.function.name,
+                    "description": t.function.description,
+                    "input_schema": t.function.parameters
+                })
+            else:
+                anthropic_tools.append(t)
+        return anthropic_tools
+
     # ==========================================
     #         能力接口实现
     # ==========================================
@@ -154,12 +222,16 @@ class AnthropicProvider(BaseProvider):
         params = self._convert_params(model, **kwargs)
         client = self._get_client(model)
         
+        # 处理工具转换 (MengLong Standard -> Anthropic Format)
+        if "tools" in params:
+             params["tools"] = self._convert_tools(params["tools"])
+
+        # 提取系统提示词
         system_prompt = ""
         for m in messages:
             role_val = m.role.value if hasattr(m.role, "value") else m.role
             if role_val == "system":
                 system_prompt = m.content
-                print(system_prompt)
                 break
 
         response = client.messages.create(
@@ -174,6 +246,11 @@ class AnthropicProvider(BaseProvider):
         params = self._convert_params(model, **kwargs)
         client = self._get_client(model)
         
+        # 处理工具转换
+        if "tools" in params:
+             params["tools"] = self._convert_tools(params["tools"])
+
+        # 提取系统提示词
         system_prompt = ""
         for m in messages:
             role_val = m.role.value if hasattr(m.role, "value") else m.role

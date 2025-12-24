@@ -70,15 +70,30 @@ class Model:
                 raise ValueError(f"Invalid message type: {type(msg)}")
         return validated
 
+    def _ensure_tools(self, tools: Optional[List[Any]]) -> Optional[List[Any]]:
+        """归一化工具列表：支持 @tool 函数、ToolInfo 对象或原始字典"""
+        if not tools:
+            return None
+        
+        normalized = []
+        for t in tools:
+            if callable(t) and hasattr(t, "schema"):
+                normalized.append(t.schema())
+            else:
+                normalized.append(t)
+        return normalized
+
     def chat(self, messages: List[Union[Message, Dict[str, Any]]], model: Optional[str] = None, **kwargs) -> Response:
         """
         发送聊天请求。
-        - messages: 消息列表
-        - model: 可选，覆盖初始化时的默认模型 (格式: 'provider/model')
-        - kwargs: 其他参数 (temperature, max_tokens, thinking 等)
         """
         provider, model_name = self._get_provider_and_model_name(model)
         messages = self._ensure_messages(messages)
+        
+        # 处理工具自动化转换
+        if "tools" in kwargs:
+            kwargs["tools"] = self._ensure_tools(kwargs["tools"])
+            
         return provider.chat(messages, model=model_name, **kwargs)
 
     def stream_chat(self, messages: List[Union[Message, Dict[str, Any]]], model: Optional[str] = None, **kwargs) -> Generator[StreamResponse, None, None]:
@@ -87,6 +102,10 @@ class Model:
         """
         provider, model_name = self._get_provider_and_model_name(model)
         messages = self._ensure_messages(messages)
+        
+        if "tools" in kwargs:
+            kwargs["tools"] = self._ensure_tools(kwargs["tools"])
+            
         return provider.stream_chat(messages, model=model_name, **kwargs)
 
     def embed(self, texts: List[str], model: Optional[str] = None, **kwargs) -> EmbedResponse:

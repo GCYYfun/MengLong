@@ -20,3 +20,4 @@ src/old_menglong_v2
 *key.json
 *.py
 !src/**/*.py
+!verify/*.py
