@@ -1,5 +1,5 @@
 import json
-from typing import List, Generator, Dict, Any, Optional
+from typing import List, Generator, Dict, Any, Optional, AsyncGenerator
 
 from menglong.models.providers.base import BaseProvider
 from menglong.models.providers.registry import ProviderRegistry
@@ -23,6 +23,10 @@ class OpenAIProvider(BaseProvider):
         
         # 支持通过配置指定 api_key 和 base_url
         self.client = openai.OpenAI(
+            api_key=config.api_key,
+            base_url=config.base_url
+        )
+        self.async_client = openai.AsyncOpenAI(
             api_key=config.api_key,
             base_url=config.base_url
         )
@@ -208,4 +212,36 @@ class OpenAIProvider(BaseProvider):
             **params
         )
         for chunk in stream:
+            yield self._normalize_stream_chunk(chunk, model)
+
+    # ==========================================
+    #         异步能力接口实现
+    # ==========================================
+
+    async def async_chat(self, messages: List[Message], model: str, **kwargs) -> Response:
+        params = self._convert_params(model, **kwargs)
+        
+        if "tools" in params:
+            params["tools"] = self._convert_tools(params["tools"])
+
+        response = await self.async_client.chat.completions.create(
+            model=model,
+            messages=self._convert_messages(messages),
+            **params
+        )
+        return self._normalize_response(response, model)
+
+    async def async_stream_chat(self, messages: List[Message], model: str, **kwargs) -> AsyncGenerator[StreamResponse, None]:
+        params = self._convert_params(model, **kwargs)
+        
+        if "tools" in params:
+            params["tools"] = self._convert_tools(params["tools"])
+
+        stream = await self.async_client.chat.completions.create(
+            model=model,
+            messages=self._convert_messages(messages),
+            stream=True,
+            **params
+        )
+        async for chunk in stream:
             yield self._normalize_stream_chunk(chunk, model)

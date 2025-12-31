@@ -1,4 +1,4 @@
-from typing import List, Generator, Dict, Any, Optional
+from typing import List, Generator, Dict, Any, Optional, AsyncGenerator
 import os
 from google import genai
 from google.genai import types
@@ -26,8 +26,10 @@ class GoogleProvider(BaseProvider):
         vertexai = getattr(config, "vertexai", False)
         
         if vertexai:
+            credentials = getattr(config, "google_application_credentials")
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials
             project = getattr(config, "project", os.getenv("GOOGLE_CLOUD_PROJECT"))
-            location = getattr(config, "location", "us-central1") # 默认 location
+            location = getattr(config, "location", "global") # 默认 location
             self.client = genai.Client(
                 vertexai=True, 
                 project=project, 
@@ -286,4 +288,81 @@ class GoogleProvider(BaseProvider):
         )
         
         for chunk in response:
+            yield self._normalize_stream_chunk(chunk, model)
+
+    # ==========================================
+    #         异步能力接口实现
+    # ==========================================
+
+    async def async_chat(self, messages: List[Message], model: str, **kwargs) -> Response:
+        params = self._convert_params(model, **kwargs)
+        
+        # 提取系统指令
+        system_instruction = None
+        for m in messages:
+            role_val = m.role.value if hasattr(m.role, "value") else m.role
+            if role_val == "system":
+                system_instruction = m.content
+                break
+        
+        if system_instruction:
+            params["system_instruction"] = system_instruction
+
+        if "tools" in params:
+             params["tools"] = self._convert_tools(params["tools"])
+
+        response = await self.client.aio.models.generate_content(
+            model=model,
+            contents=self._convert_messages(messages),
+            config=types.GenerateContentConfig(**params)
+        )
+        return self._normalize_response(response, model)
+
+    async def async_stream_chat(self, messages: List[Message], model: str, **kwargs) -> AsyncGenerator[StreamResponse, None]:
+        params = self._convert_params(model, **kwargs)
+        
+        # 处理工具转换 (MengLong Standard -> Google GenAI Spec)
+        google_tools = None
+        if "tools" in params:
+            decls = []
+            other_tools = []
+            for t in params.pop("tools"):
+                if hasattr(t, "function"):
+                    decls.append(types.FunctionDeclaration(
+                        name=t.function.name,
+                        description=t.function.description,
+                        parameters=t.function.parameters
+                    ))
+                elif isinstance(t, dict) and "function" in t:
+                    decls.append(types.FunctionDeclaration(
+                        name=t["function"]["name"],
+                        description=t["function"]["description"],
+                        parameters=t["function"]["parameters"]
+                    ))
+                else:
+                    other_tools.append(t)
+            
+            google_tools = []
+            if decls:
+                google_tools.append(types.Tool(function_declarations=decls))
+            google_tools.extend(other_tools)
+
+        system_instruction = None
+        for m in messages:
+            role_val = m.role.value if hasattr(m.role, "value") else m.role
+            if role_val == "system":
+                system_instruction = m.content
+                break
+
+        response = await self.client.aio.models.generate_content_stream(
+            model=model,
+            contents=self._convert_messages(messages),
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                tools=google_tools,
+                **params
+            )
+        )
+        
+        async for chunk in response:
             yield self._normalize_stream_chunk(chunk, model)

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Generator, Union, Dict, Any, Optional
+from typing import List, Generator, Union, Dict, Any, Optional, AsyncGenerator
 
 from menglong.schemas.chat import (
     Message, 
@@ -88,6 +88,26 @@ class BaseProvider(ABC):
         **kwargs
     ) -> Generator[StreamResponse, None, None]:
         """流式聊天接口"""
+        pass
+
+    @abstractmethod
+    async def async_chat(
+        self, 
+        messages: List[Message], 
+        model: str,
+        **kwargs
+    ) -> Response:
+        """异步聊天接口"""
+        pass
+
+    @abstractmethod
+    async def async_stream_chat(
+        self, 
+        messages: List[Message], 
+        model: str,
+        **kwargs
+    ) -> AsyncGenerator[StreamResponse, None]:
+        """异步流式聊天接口"""
         pass
 
     def embed(self, texts: List[str], model: str, **kwargs) -> EmbedResponse:

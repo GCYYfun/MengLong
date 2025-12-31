@@ -25,14 +25,19 @@ def test_real_call():
         test_models = [args.model]
     else:
         # 默认测试列表
+        # test_models = [
+        #     "openai/gpt-5.1",
+        #     "deepseek/deepseek-chat",
+        #     "aws/global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        #     "anthropic/global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        #     "google/gemini-3-pro-preview",
+        #     "infinigence/claude-sonnet-4-20250514"
+        # ]
         test_models = [
-            "openai/gpt-5.1",
-            "deepseek/deepseek-chat",
-            "aws/global.anthropic.claude-sonnet-4-5-20250929-v1:0",
-            # "anthropic/claude-3-5-sonnet-20240620",
-            "anthropic/global.anthropic.claude-sonnet-4-5-20250929-v1:0",
-            "google/gemini-3-pro-preview",
-            "infinigence/claude-sonnet-4-20250514"
+            "menglong/deepseek-chat",
+            # "menglong/gpt-5.1",
+            # "menglong/claude-sonnet-4-20250514",
+            # "menglong/global.anthropic.claude-sonnet-4-5-20250929-v1:0",
         ]
             
     for model_id in test_models:
@@ -41,7 +46,7 @@ def test_real_call():
             
             print(f"Initiating request...")
             
-            messages = [{"role": "user", "content": "Say :Hello Bro!print a picture"}]
+            messages = [{"role": "user", "content": "Say :Hello Bro! print a picture"}]
             
             response = model.chat(messages,model_id)
             

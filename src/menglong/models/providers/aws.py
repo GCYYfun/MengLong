@@ -1,4 +1,4 @@
-from typing import List, Generator, Dict, Any, Optional
+from typing import List, Generator, Dict, Any, Optional,AsyncGenerator
 import boto3
 import json
 import os
@@ -22,12 +22,11 @@ class AWSProvider(BaseProvider):
     
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
-        # 允许从配置中读取 region 和 profile
-        region = getattr(config, "region", None) or os.getenv("AWS_REGION", "us-east-1")
-        profile = getattr(config, "profile", None)
-        
-        session = boto3.Session(profile_name=profile)
-        self.client = session.client(
+        # 从配置中读取 region 和 key
+        region = getattr(config, "region", None) or os.getenv("AWS_REGION", "us-west-2")
+        bedrock_token = getattr(config, "aws_bearer_token_bedrock", None)
+        os.environ["AWS_BEARER_TOKEN_BEDROCK"] = bedrock_token
+        self.client = boto3.Session().client(
             service_name="bedrock-runtime",
             region_name=region
         )
@@ -268,3 +267,23 @@ class AWSProvider(BaseProvider):
         
         for event in response.get("stream"):
             yield self._normalize_stream_chunk(event, model)
+
+    async def async_chat(
+        self, 
+        messages: List[Message], 
+        model: str,
+        **kwargs
+    ) -> Response:
+        """异步聊天接口"""
+        raise ValueError("boto3 converse api not support async,at now.")
+        pass
+
+    async def async_stream_chat(
+        self, 
+        messages: List[Message], 
+        model: str,
+        **kwargs
+    ) -> AsyncGenerator[StreamResponse, None]:
+        """异步流式聊天接口"""
+        raise ValueError("boto3 converse api not support async,at now.")
+        pass

@@ -1,4 +1,4 @@
-from typing import List, Generator, Tuple, Optional, Dict, Any, Union
+from typing import List, Generator, Tuple, Optional, Dict, Any, Union, AsyncGenerator
 
 from menglong.schemas.chat import (
     Message, 
@@ -23,7 +23,7 @@ class Model:
         default_model_id: 默认模型 ID (格式: 'provider/model')
         """
         self.config = load_config(config_path)
-        self.default_model_id = default_model_id
+        self.default_model_id = default_model_id or self.config.default.model_id
         self._providers: Dict[str, BaseProvider] = {}
 
     def _parse_model_id(self, model_id: str) -> tuple[str, str]:
@@ -116,3 +116,29 @@ class Model:
         """
         provider, model_name = self._get_provider_and_model_name(model)
         return provider.embed(texts, model=model_name, **kwargs)
+
+    async def async_chat(self, messages: List[Union[Message, Dict[str, Any]]], model: Optional[str] = None, **kwargs) -> Response:
+        """
+        异步发送聊天请求。
+        """
+        provider, model_name = self._get_provider_and_model_name(model)
+        messages = self._ensure_messages(messages)
+        
+        # 处理工具自动化转换
+        if "tools" in kwargs:
+            kwargs["tools"] = self._ensure_tools(kwargs["tools"])
+            
+        return await provider.async_chat(messages, model=model_name, **kwargs)
+
+    async def async_stream_chat(self, messages: List[Union[Message, Dict[str, Any]]], model: Optional[str] = None, **kwargs) -> AsyncGenerator[StreamResponse, None]:
+        """
+        异步流式发送聊天请求。
+        """
+        provider, model_name = self._get_provider_and_model_name(model)
+        messages = self._ensure_messages(messages)
+        
+        if "tools" in kwargs:
+            kwargs["tools"] = self._ensure_tools(kwargs["tools"])
+            
+        async for chunk in provider.async_stream_chat(messages, model=model_name, **kwargs):
+            yield chunk

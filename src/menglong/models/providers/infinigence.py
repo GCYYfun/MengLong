@@ -7,7 +7,7 @@ from menglong.utils.config.config_type import ProviderConfig
 @ProviderRegistry.register("infinigence")
 class InfinigenceProvider(OpenAIProvider):
     """
-    Infinigence (无问芯安) Provider
+    Infinigence (无问芯穹) Provider
     由于其高度兼容 OpenAI 协议，直接继承自 OpenAIProvider。
     """
     

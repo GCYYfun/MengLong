@@ -1,6 +1,6 @@
-from typing import List, Generator, Dict, Any, Optional, Union
+from typing import List, Generator, Dict, Any, Optional, Union, AsyncGenerator
 import os
-from anthropic import Anthropic, AnthropicBedrock
+from anthropic import Anthropic, AnthropicBedrock, AsyncAnthropic, AsyncAnthropicBedrock
 
 from menglong.models.providers.base import BaseProvider
 from menglong.models.providers.registry import ProviderRegistry
@@ -22,6 +22,8 @@ class AnthropicProvider(BaseProvider):
         super().__init__(config)
         self._native_client = None
         self._bedrock_client = None
+        self._async_native_client = None
+        self._async_bedrock_client = None
 
     def _get_client(self, model: str) -> Union[Anthropic, AnthropicBedrock]:
         """
@@ -34,7 +36,7 @@ class AnthropicProvider(BaseProvider):
         
         if is_bedrock:
             if not self._bedrock_client:
-                region = getattr(self.config, "region", None) or os.getenv("AWS_REGION", "us-west-1")
+                region = getattr(self.config, "region", None) or os.getenv("AWS_REGION", "us-west-2")
                 # 支持 AWS 凭证透传
                 aws_access_key = getattr(self.config, "aws_access_key", os.getenv("AWS_ACCESS_KEY_ID"))
                 aws_secret_key = getattr(self.config, "aws_secret_key", os.getenv("AWS_SECRET_ACCESS_KEY"))
@@ -52,6 +54,32 @@ class AnthropicProvider(BaseProvider):
                     raise ValueError("Anthropic API key is missing for native call.")
                 self._native_client = Anthropic(api_key=api_key, base_url=self.config.base_url)
             return self._native_client
+    
+    def _get_async_client(self, model: str) -> Union[AsyncAnthropic, AsyncAnthropicBedrock]:
+        """
+        根据模型 ID 智能识别应使用的异步客户端类。
+        """
+        is_bedrock = "anthropic." in model or model.startswith(("us.", "global."))
+        
+        if is_bedrock:
+            if not self._async_bedrock_client:
+                region = getattr(self.config, "region", None) or os.getenv("AWS_REGION", "us-west-1")
+                aws_access_key = getattr(self.config, "aws_access_key", os.getenv("AWS_ACCESS_KEY_ID"))
+                aws_secret_key = getattr(self.config, "aws_secret_key", os.getenv("AWS_SECRET_ACCESS_KEY"))
+                
+                self._async_bedrock_client = AsyncAnthropicBedrock(
+                    aws_access_key=aws_access_key,
+                    aws_secret_key=aws_secret_key,
+                    aws_region=region
+                )
+            return self._async_bedrock_client
+        else:
+            if not self._async_native_client:
+                api_key = self.config.api_key or os.getenv("ANTHROPIC_API_KEY")
+                if not api_key:
+                    raise ValueError("Anthropic API key is missing for native call.")
+                self._async_native_client = AsyncAnthropic(api_key=api_key, base_url=self.config.base_url)
+            return self._async_native_client
 
     def _convert_params(self, model: str, **kwargs) -> Dict[str, Any]:
         """[由内向外]：转换参数，并注入 Anthropic 强制要求的默认值"""
@@ -265,4 +293,57 @@ class AnthropicProvider(BaseProvider):
             **params
         ) as stream:
             for event in stream:
+                yield self._normalize_stream_chunk(event, model)
+
+    # ==========================================
+    #         异步能力接口实现
+    # ==========================================
+
+    async def async_chat(self, messages: List[Message], model: str, **kwargs) -> Response:
+        params = self._convert_params(model, **kwargs)
+        client = self._get_async_client(model)
+        
+        # 处理工具转换 (MengLong Standard -> Anthropic Format)
+        if "tools" in params:
+             params["tools"] = self._convert_tools(params["tools"])
+
+        # 提取系统提示词
+        system_prompt = ""
+        for m in messages:
+            role_val = m.role.value if hasattr(m.role, "value") else m.role
+            if role_val == "system":
+                system_prompt = m.content
+                break
+
+        response = await client.messages.create(
+            model=model,
+            messages=self._convert_messages(messages),
+            system=system_prompt,
+            **params
+        )
+        return self._normalize_response(response, model)
+
+    async def async_stream_chat(self, messages: List[Message], model: str, **kwargs) -> AsyncGenerator[StreamResponse, None]:
+        params = self._convert_params(model, **kwargs)
+        client = self._get_async_client(model)
+        
+        # 处理工具转换
+        if "tools" in params:
+             params["tools"] = self._convert_tools(params["tools"])
+
+        # 提取系统提示词
+        system_prompt = ""
+        for m in messages:
+            role_val = m.role.value if hasattr(m.role, "value") else m.role
+            if role_val == "system":
+                system_prompt = m.content
+                break
+
+        async with client.messages.stream(
+            model=model,
+            messages=self._convert_messages(messages),
+            system=system_prompt,
+            **params
+        ) as stream:
+            async for event in stream:
                 yield self._normalize_stream_chunk(event, model)
