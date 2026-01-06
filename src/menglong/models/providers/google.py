@@ -78,11 +78,24 @@ class GoogleProvider(BaseProvider):
                             google_parts.append(types.Part(text=part.text))
                         elif part.type == "image":
                             if part.image_url:
-                                google_parts.append(types.Part.from_uri(uri=part.image_url.get("url", ""), mime_type=part.media_type or "image/jpeg"))
+                                url = part.image_url.get("url", "") if isinstance(part.image_url, dict) else part.image_url
+                                google_parts.append(types.Part.from_uri(file_uri=url, mime_type=part.media_type or "image/jpeg"))
                             elif part.data:
                                 google_parts.append(types.Part.from_bytes(data=base64.b64decode(part.data), mime_type=part.media_type or "image/jpeg"))
                         elif part.type == "document":
                             google_parts.append(types.Part.from_bytes(data=base64.b64decode(part.data), mime_type=part.media_type or "application/pdf"))
+                        elif part.type == "audio":
+                            # Gemini 2.0 Flash 支持音频
+                            if part.audio_url:
+                                google_parts.append(types.Part.from_uri(file_uri=part.audio_url, mime_type=part.media_type or "audio/mp3"))
+                            elif part.data:
+                                google_parts.append(types.Part.from_bytes(data=base64.b64decode(part.data), mime_type=part.media_type or "audio/mp3"))
+                        elif part.type == "video":
+                            # Gemini 2.0 Flash 支持视频
+                            if part.video_url:
+                                google_parts.append(types.Part.from_uri(file_uri=part.video_url, mime_type=part.media_type or "video/mp4"))
+                            elif part.data:
+                                google_parts.append(types.Part.from_bytes(data=base64.b64decode(part.data), mime_type=part.media_type or "video/mp4"))
                         elif part.type == "action":
                             google_parts.append(types.Part(function_call=types.FunctionCall(
                                 name=part.name,

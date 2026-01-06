@@ -86,6 +86,22 @@ class AWSProvider(BaseProvider):
                                     "source": {"bytes": base64.b64decode(part.data)}
                                 }
                             })
+                        elif part.type == "audio":
+                            # AWS Bedrock 目前不支持音频输入
+                            import warnings
+                            warnings.warn(
+                                "AWS Bedrock Converse API 目前不支持音频输入。音频内容将被忽略。",
+                                UserWarning
+                            )
+                            continue
+                        elif part.type == "video":
+                            # AWS Bedrock 目前不支持视频输入
+                            import warnings
+                            warnings.warn(
+                                "AWS Bedrock Converse API 目前不支持视频输入。视频内容将被忽略。",
+                                UserWarning
+                            )
+                            continue
                         elif part.type == "action":
                             bedrock_content.append({
                                 "toolUse": {

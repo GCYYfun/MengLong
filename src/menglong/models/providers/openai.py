@@ -51,15 +51,39 @@ class OpenAIProvider(BaseProvider):
                     if part_type == "text":
                         serialized_content.append({"type": "text", "text": getattr(part, "text", "")})
                     elif part_type == "image":
-                        # OpenAI 格式: {"type": "image_url", "image_url": {"url": "..."}}
+                        # OpenAI 格式: {"type": "image_url", "image_url": {"url": "...", "detail": "high"}}
                         img_data = {}
                         if getattr(part, "image_url", None):
-                            img_data = {"url": part.image_url.get("url", "")}
+                            # 从 image_url 字典中提取 url 和可选的 detail
+                            img_data = part.image_url.copy() if isinstance(part.image_url, dict) else {"url": part.image_url}
                         elif getattr(part, "data", None):
                             # 处理 Base64
                             mime = getattr(part, "media_type", "image/jpeg")
                             img_data = {"url": f"data:{mime};base64,{part.data}"}
+                        
+                        # 添加 detail 参数(如果提供)
+                        detail = getattr(part, "detail", None)
+                        if detail and "detail" not in img_data:
+                            img_data["detail"] = detail
+                            
                         serialized_content.append({"type": "image_url", "image_url": img_data})
+                    elif part_type == "audio":
+                        # OpenAI 不支持音频输入(除了 Whisper API)
+                        import warnings
+                        warnings.warn(
+                            "OpenAI Chat Completions API 不支持音频输入。"
+                            "如需音频转录,请使用 Whisper API。音频内容将被忽略。",
+                            UserWarning
+                        )
+                        continue
+                    elif part_type == "video":
+                        # OpenAI 不支持视频输入
+                        import warnings
+                        warnings.warn(
+                            "OpenAI Chat Completions API 不支持视频输入。视频内容将被忽略。",
+                            UserWarning
+                        )
+                        continue
                     elif part_type == "action" or part_type == "outcome":
                         # OpenAI 不允许工具调用出现在 content 列表中
                         continue

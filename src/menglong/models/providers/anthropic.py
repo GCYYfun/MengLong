@@ -120,11 +120,12 @@ class AnthropicProvider(BaseProvider):
                         serialized_content.append({"type": "text", "text": part.text})
                     elif part.type == "image":
                         if part.image_url:
+                            url = part.image_url.get("url", "") if isinstance(part.image_url, dict) else part.image_url
                             serialized_content.append({
                                 "type": "image",
                                 "source": {
                                     "type": "url",
-                                    "url": part.image_url.get("url", "")
+                                    "url": url
                                 }
                             })
                         elif part.data:
@@ -136,6 +137,32 @@ class AnthropicProvider(BaseProvider):
                                     "data": part.data
                                 }
                             })
+                    elif part.type == "document":
+                        # Anthropic 支持 PDF 文档
+                        serialized_content.append({
+                            "type": "document",
+                            "source": {
+                                "type": "base64",
+                                "media_type": part.media_type or "application/pdf",
+                                "data": part.data
+                            }
+                        })
+                    elif part.type == "audio":
+                        # Anthropic 目前不支持音频输入
+                        import warnings
+                        warnings.warn(
+                            "Anthropic API 目前不支持音频输入。音频内容将被忽略。",
+                            UserWarning
+                        )
+                        continue
+                    elif part.type == "video":
+                        # Anthropic 目前不支持视频输入
+                        import warnings
+                        warnings.warn(
+                            "Anthropic API 目前不支持视频输入。视频内容将被忽略。",
+                            UserWarning
+                        )
+                        continue
                     elif part.type == "action":
                         serialized_content.append({
                             "type": "tool_use",

@@ -3,11 +3,13 @@ MengLong API测试脚本
 这个脚本使用requests库发送HTTP请求，测试MengLong的API服务
 """
 
+import traceback
 import os
 import json
 import argparse
 from enum import Enum
 import requests
+import httpx
 from typing import List, Dict, Any, Optional, Union
 import time
 
@@ -60,10 +62,42 @@ def print_response(response, is_stream=False):
 def test_get_models():
     """测试获取可用模型列表"""
     print("\n正在测试: 获取可用模型列表")
-    response = requests.get(f"{SERVER_URL}/api/models")
+    response = requests.get(f"{SERVER_URL}/models",headers=headers)
     print_response(response)
 
+def test_httpx_chat(message, model_id="deepseek-chat", stream=True):
 
+    print(f"\n正在测试: 基础聊天API (model_id={model_id})")
+
+    messages = [{"role": "user", "content": message,"tool_id":""}]
+    payload = {
+        "model": model_id,
+        "messages": messages,
+    }
+
+    client = httpx.Client(
+            base_url=SERVER_URL,
+            headers=headers,
+            timeout=60.0
+    )
+    if stream:
+        payload.update({"stream":True})
+        print("流式输出....")
+        with client.stream("POST", "/chat", json=payload) as res:
+            for line in res.iter_lines():
+                if line.strip():
+                    # print(line,flush=True)
+                    # 处理 SSE 格式: "data: {...}"
+                    try:
+                        chunk_data = json.loads(line)
+                        print(chunk_data["output"]["delta"]["text"],end="",flush=True)
+                    except json.JSONDecodeError:
+                        continue
+    else:
+        response = client.post("/chat", json=payload)
+        print_response(response)
+        response.raise_for_status()
+        
 def test_chat(message, model_id=ModelID.ANTHROPIC_CLAUDE_3_7, stream=False):
     """测试基础聊天API"""
     print(f"\n正在测试: 基础聊天API (model_id={model_id})")
@@ -223,7 +257,8 @@ def main():
         test_get_models()
 
     if args.test in ["all", "chat"]:
-        test_chat("你好，请介绍一下MengLong框架的主要功能")
+        test_httpx_chat("你好，请介绍一下MengLong框架的主要功能")
+        # test_chat("你好，请介绍一下MengLong框架的主要功能")
 
     if args.test in ["all", "agent"]:
         test_agent_chat("js_st_mem", "你好，你是谁？请简单介绍一下自己。")
