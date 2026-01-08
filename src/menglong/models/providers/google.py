@@ -49,6 +49,26 @@ class GoogleProvider(BaseProvider):
     #         生命周期钩子实现
     # ==========================================
 
+    def _convert_params(self, model: str, **kwargs) -> Dict[str, Any]:
+        """
+        覆盖基类方法，添加 Google 特定的参数映射。
+        
+        Google GenAI SDK 使用不同的参数名称:
+        - max_tokens → max_output_tokens
+        - stop → stop_sequences
+        """
+        # 先调用基类方法获取合并后的参数
+        params = super()._convert_params(model, **kwargs)
+        
+        # 参数名称映射
+        if "max_tokens" in params:
+            params["max_output_tokens"] = params.pop("max_tokens")
+        
+        if "stop" in params:
+            params["stop_sequences"] = params.pop("stop")
+        
+        return params
+
     def _convert_messages(self, messages: List[Message]) -> List[types.Content]:
         """
         讲 SDK 内部消息转换为 Google GenAI 格式。

@@ -34,7 +34,8 @@ def test_real_call():
         #     "infinigence/claude-sonnet-4-20250514"
         # ]
         test_models = [
-            "menglong/deepseek-chat",
+            "menglong/gemini-3-pro-preview",
+            # "menglong/deepseek-chat",
             # "menglong/gpt-5.1",
             # "menglong/claude-sonnet-4-20250514",
             # "menglong/global.anthropic.claude-sonnet-4-5-20250929-v1:0",
