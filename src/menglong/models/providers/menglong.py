@@ -81,7 +81,7 @@ class MengLongProvider(BaseProvider):
                 "role": role_val,
                 "content": content
             }
-            if msg.tool_id:
+            if hasattr(msg, "tool_id") and msg.tool_id:
                 m["tool_id"] = msg.tool_id
             
             menglong_msgs.append(m)

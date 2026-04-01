@@ -96,7 +96,7 @@ class Action(ContentPart):
     type: str = "action"
     id: Any = None
     name: str = ""
-    arguments: Optional[Dict[str, Any]] = None
+    arguments: Optional[Union[Dict[str, Any], str]] = None
 
 
 class Outcome(ContentPart):
@@ -109,9 +109,9 @@ class Outcome(ContentPart):
 class Message(BaseModel):
     """聊天消息"""
     role: MessageRole
-    content: Optional[Union[str, List[Union[ContentPart, Dict[str, Any]]]]] = None
+    content: Optional[Union[str, List[Union[Action,Outcome,VideoPart,AudioPart,DocumentPart,ImagePart,TextPart, Dict[str, Any]]]]] = None
     # outcomes: Optional[List[Outcome]] = None
-    tool_id: Any = None
+    # tool_id: Any = None
 
     model_config = ConfigDict(use_enum_values=True)
 
@@ -301,17 +301,17 @@ def System(content: str) -> Message:
 def Tool(tool_id: Any, content: str, **kwargs) -> Message:
     """
     快捷构造 Tool 结果消息。
+    tool_id 存储在 Outcome.id 中，Provider 在转换时从这里读取 tool_call_id。
     部分 Provider 内部会将其映射为 user 或特定 role。
     """
     parts = [Outcome(
-        id=tool_id, 
-        name=kwargs.get("name"), 
-        result=content, 
+        id=tool_id,
+        name=kwargs.get("name"),
+        result=content,
     )]
     return Message(
-        role=MessageRole.TOOL, 
-        content=parts, 
-        tool_id=tool_id,
+        role=MessageRole.TOOL,
+        content=parts,
     )
 
 

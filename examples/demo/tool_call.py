@@ -7,28 +7,29 @@ This demo shows how to use tool calls with both OpenAI and DeepSeek models in th
 
 from typing import List, Dict, Any, Optional
 import json
-from menglong.ml_model import Model
-from menglong.utils.log.logging_tool import (
-    print,
-    print_rule,
-    print_json,
-    print_table,
-    MessageType,
-    configure_logger,
-    get_logger,
-)
+from menglong import Model
+import rich
+# from utils.log.logging_tool import (
+#     print,
+#     print_rule,
+#     print_json,
+#     print_table,
+#     MessageType,
+#     configure_logger,
+#     get_logger,
+# )
 
 # from menglong.ml_model.utils import user, assistant, system, tool, tool_res
-from menglong.ml_model.schema.ml_request import (
-    SystemMessage as system,
-    ToolMessage as tool,
-    AssistantMessage as assistant,
-    UserMessage as user,
+from menglong import (
+    System as system,
+    Tool as tool,
+    Assistant as assistant,
+    User as user,
 )
 
 
 # Define a simple weather tool
-def get_weather(location: str, unit: str = "celsius") -> Dict[str, Any]:
+def get_weather(location: str, unit: str = "celsius") -> str:
     """Get the current weather in a given location.
 
     Args:
@@ -46,8 +47,8 @@ def get_weather(location: str, unit: str = "celsius") -> Dict[str, Any]:
         "forecast": ["sunny", "windy"],
         "humidity": 60,
     }
-    print(f"Weather tool called for {location} in {unit}", MessageType.INFO)
-    return weather_data
+    # print(f"Weather tool called for {location} in {unit}", MessageType.INFO)
+    return str(weather_data)
 
 
 # Define available tools
@@ -181,57 +182,45 @@ def openai_tool_call_demo():
 
 def deepseek_tool_call_demo():
     """Demo of tool calls using DeepSeek models"""
-    print_rule("DeepSeek Tool Call Demo", style="blue")
+    # print_rule("DeepSeek Tool Call Demo", style="blue")
 
-    model = Model(model_id="deepseek-chat")
+    model = Model(default_model_id="deepseek/deepseek-chat")
 
-    # System message that instructs the model to use tools
-    messages = [
-        system(
-            content="You are a helpful assistant that can use tools to answer user questions."
-        ),
-        user(content="What's the weather like in Shanghai?"),
-    ]
+    # 使用 Context 管理对话状态
+    from menglong.schemas.chat import Context
+    ctx = Context()
+    ctx.system("You are a helpful assistant that can use tools to answer user questions.")
+    ctx.user("What's the weather like in Shanghai?")
 
     # Call the model with tool definitions
     response = model.chat(
-        messages=messages,
+        messages=ctx,
         tools=[weather_tool],
         tool_choice="auto",
     )
+    # print("res:", response)
 
     # Check if there are tool calls in the response
-    if hasattr(response.message, "tool_desc") and response.message.tool_desc:
-        print("Model requested to use a tool:", MessageType.SUCCESS, title="Tool Call")
-        for tool_call in response.message.tool_desc:
-            print_json(tool_call, title="Tool Call Object")
-            print_table(
-                [["Name", tool_call.name], ["Arguments", tool_call.arguments]],
-                ["Property", "Value"],
-                title="Tool Details",
-            )
+    if response.tool_calls:
+        # 1. 把 assistant 的工具调用请求写回 Context（OpenAI 协议要求它必须在 tool 消息之前）
+        ctx.assistant(
+            content=response.text,
+            tool_calls=[tc.model_dump() for tc in response.tool_calls]
+        )
 
-            # Parse the arguments and call the appropriate function
+        for tool_call in response.tool_calls:
             if tool_call.name == "get_weather":
-                args = json.loads(tool_call.arguments)
-                weather_result = get_weather(**args)
+                args = tool_call.arguments
+                result = get_weather(**args)
+                # 2. 把工具执行结果追加到 Context
+                ctx.tool(tool_id=tool_call.id, content=result)
 
-                # Add the tool response to messages
-
-                messages.append(response.message)
-
-                messages.append(
-                    tool(tool_id=tool_call.id, content=json.dumps(weather_result))
-                )
-
-        print("Processing tool response...", MessageType.INFO)
         # Get the final response from the model
-        final_response = model.chat(messages=messages, model_id="deepseek-chat")
-        print_rule("Final Response", style="cyan")
-        print(final_response.message.content, MessageType.AGENT, use_panel=True)
+        final_response = model.chat(messages=ctx)
+        print(final_response.text)
     else:
-        print("No tool calls were made.", MessageType.WARNING)
-        print(response.message.content, MessageType.AGENT, use_panel=True)
+        print("No tool calls were made.")
+        print(response.text)
 
 
 def anthropic_tool_call_demo():
@@ -295,26 +284,26 @@ def anthropic_tool_call_demo():
 
 def main():
     # 配置日志
-    configure_logger(log_file="tool_call_demo.log")
-    logger = get_logger()
+    # configure_logger(log_file="tool_call_demo.log")
+    # logger = get_logger()
 
-    logger.info("启动工具调用演示")
-    print("Starting Tool Call Demo...", MessageType.INFO)
+    # logger.info("启动工具调用演示")
+    # print("Starting Tool Call Demo...", MessageType.INFO)
 
-    print_rule("OpenAI Demo", style="green")
-    logger.info("开始 OpenAI 工具调用演示")
-    openai_tool_call_demo()
+    # print_rule("OpenAI Demo", style="green")
+    # logger.info("开始 OpenAI 工具调用演示")
+    # openai_tool_call_demo()
 
-    print_rule("DeepSeek Demo", style="blue")
-    logger.info("开始 DeepSeek 工具调用演示")
+    # print_rule("DeepSeek Demo", style="blue")
+    # logger.info("开始 DeepSeek 工具调用演示")
     deepseek_tool_call_demo()
 
-    print_rule("Anthropic Demo", style="magenta")
-    logger.info("开始 Anthropic 工具调用演示")
-    anthropic_tool_call_demo()
+    # print_rule("Anthropic Demo", style="magenta")
+    # logger.info("开始 Anthropic 工具调用演示")
+    # anthropic_tool_call_demo()
 
-    logger.info("工具调用演示完成")
-    print("Tool Call Demo completed.", MessageType.SUCCESS, title="Completed")
+    # logger.info("工具调用演示完成")
+    print("Tool Call Demo completed.")
 
 
 if __name__ == "__main__":
