@@ -277,20 +277,20 @@ def User(content: Union[str, List[Any]], **kwargs) -> Message:
 
     return Message(role=MessageRole.USER, content=parts)
 
-def Assistant(content: Optional[str] = None, tool_calls: Optional[List[Dict]] = None) -> Message:
+def Assistant(content: Optional[str] = None, actions: Optional[List[Dict]] = None) -> Message:
     """快捷构造 Assistant 消息，支持工具调用负载"""
-    if not tool_calls:
+    if not actions:
         return Message(role=MessageRole.ASSISTANT, content=content)
     
     parts = []
     if content:
         parts.append(TextPart(text=content))
     
-    for tc in tool_calls:
+    for action in actions:
         parts.append(Action(
-            id=tc.get("id", ""),
-            name=tc.get("name", ""),
-            arguments=tc.get("arguments", {})
+            id=action.id,
+            name=action.name,
+            arguments=action.arguments
         ))
     return Message(role=MessageRole.ASSISTANT, content=parts)
 
