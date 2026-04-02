@@ -11,6 +11,7 @@ from menglong.schemas.chat import (
     Output, Content, Usage, Action,
     StreamOutput, Delta,
 )
+from menglong.schemas.model_info import ModelInfo
 from menglong.utils.config.config_type import ProviderConfig
 
 
@@ -166,6 +167,14 @@ class OpenAIProvider(BaseProvider):
     def _convert_tools(self, tools: List[Any]) -> List[Dict[str, Any]]:
         """将标准化工具转换为 OpenAI 格式"""
         return [t.model_dump(exclude_none=True) if hasattr(t, "model_dump") else t for t in tools]
+
+    def list_models(self) -> List[ModelInfo]:
+        """返回该 Provider 当前可用的模型列表"""
+        raw = self.client.models.list()
+        return [
+            ModelInfo(id=m.id, provider=self.provider_name, created_at=getattr(m, "created", None))
+            for m in raw
+        ]
 
     # ==========================================
     #         响应归一化（私有辅助方法）

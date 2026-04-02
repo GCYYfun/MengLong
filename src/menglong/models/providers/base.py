@@ -8,6 +8,7 @@ from menglong.schemas.chat import (
     StreamOutput,
     Delta
 )
+from menglong.schemas.model_info import ModelInfo
 from menglong.schemas.embedding import EmbedResponse
 from menglong.utils.config.config_type import ProviderConfig
 
@@ -116,6 +117,18 @@ class BaseProvider(ABC):
         并非所有 Provider 都支持，默认抛出异常。
         """
         raise NotImplementedError(f"Provider '{self.provider_name}' does not support embeddings.")
+
+    def list_models(self) -> List[ModelInfo]:
+        """
+        [可选] 返回该 Provider 当前可用的模型列表。
+        默认返回空列表；各 Provider 子类按需覆盖。
+        """
+        import warnings
+        warnings.warn(
+            f"Provider '{self.provider_name}' has not implemented list_models().",
+            UserWarning, stacklevel=2,
+        )
+        return []
 
     @property
     def provider_name(self) -> str:

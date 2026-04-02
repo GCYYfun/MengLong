@@ -10,6 +10,7 @@ from menglong.schemas.chat import (
     Output, Content, Usage, Action,
     StreamOutput, Delta
 )
+from menglong.schemas.model_info import ModelInfo
 from menglong.utils.config.config_type import ProviderConfig
 
 @ProviderRegistry.register("google")
@@ -230,21 +231,25 @@ class GoogleProvider(BaseProvider):
                     parameters=t["function"]["parameters"]
                 ))
             else:
-                # Fallback for other tool types if any, or raise error
-                # For now, assuming only function declarations are converted this way
-                # and other tool types (if any) would be handled differently or passed through.
-                # The original code had `other_tools.append(t)` for non-function tools.
-                # This simplified version assumes all tools here are function-like.
-                # If `t` is already a `types.Tool` or `types.FunctionDeclaration`, it will be appended directly.
                 functions.append(t)
-        
-        # If there are function declarations, wrap them in a single Tool object.
-        # The original code created a list of tools, where one item could be Tool(function_declarations=decls)
-        # and others could be raw tools. This simplified version assumes all tools passed to _convert_tools
-        # are meant to be function declarations.
         if functions:
             return [types.Tool(function_declarations=functions)]
         return []
+
+    def list_models(self) -> List[ModelInfo]:
+        """返回 Google GenAI 当前可用的模型列表（支持 generateContent 的）"""
+        result = []
+        for m in self.client.models.list():
+            # 只返回支持文本生成的模型
+            supported = getattr(m, "supported_actions", []) or []
+            if "generateContent" not in supported:
+                continue
+            result.append(ModelInfo(
+                id=m.name,  # google 的 name 即是模型 ID
+                provider=self.provider_name,
+                display_name=getattr(m, "display_name", None),
+            ))
+        return result
 
     # ==========================================
     #         能力接口实现

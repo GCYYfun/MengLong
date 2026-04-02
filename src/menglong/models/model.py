@@ -7,6 +7,7 @@ from menglong.schemas.chat import (
     MessageRole,
     Context
 )
+from menglong.schemas.model_info import ModelInfo
 from menglong.schemas.embedding import EmbedResponse
 from menglong.utils.config.config_type import Config, ProviderConfig
 from menglong.models.providers.registry import ProviderRegistry
@@ -116,6 +117,57 @@ class Model:
         """
         provider, model_name = self._get_provider_and_model_name(model)
         return provider.embed(texts, model=model_name, **kwargs)
+
+    def list_models(self, provider: Optional[str] = None) -> List[ModelInfo]:
+        """
+        返回指定 provider 的可用模型列表。
+        
+        Args:
+            provider: provider 名称，如 'openai'/'deepseek'/'aws'/'anthropic'/'google'。
+                      不传则使用 default_model_id 中的 provider。
+        
+        Returns:
+            ModelInfo 列表，每个元素的 id 字段可直接用于构造完整 model_id（provider/id）。
+        
+        Usage::
+
+            model = Model()
+            models = model.list_models('openai')
+            for m in models:
+                print(m)         # openai/gpt-4o
+                print(m.id)      # gpt-4o
+        """
+        if provider:
+            target_id = f"{provider}/placeholder"  # 只需要 provider 名称
+            provider_name, _ = self._parse_model_id(target_id)
+        else:
+            provider_name, _ = self._parse_model_id(self.default_model_id)
+
+        if provider_name not in self._providers:
+            self._providers[provider_name] = ProviderRegistry.get_instance(provider_name, self.config)
+
+        return self._providers[provider_name].list_models()
+
+    def list_all_models(self) -> Dict[str, List[ModelInfo]]:
+        """
+        遍历所有已配置的 provider，分别返回各自的可用模型列表。
+        
+        Returns:
+            {“provider_name”: [ModelInfo, ...]}。失败的 provider 会输出警告并返回空列表。
+        """
+        result: Dict[str, List[ModelInfo]] = {}
+        configured_providers = list(self.config.providers.__dict__.keys()) if hasattr(self.config, 'providers') else []
+
+        for pname in configured_providers:
+            try:
+                if pname not in self._providers:
+                    self._providers[pname] = ProviderRegistry.get_instance(pname, self.config)
+                result[pname] = self._providers[pname].list_models()
+            except Exception as e:
+                import warnings
+                warnings.warn(f"list_all_models: provider '{pname}' 失败 — {e}")
+                result[pname] = []
+        return result
 
     async def async_chat(self, messages: List[Union[Message, Dict[str, Any]]], model: Optional[str] = None, **kwargs) -> Response:
         """

@@ -9,6 +9,7 @@ from menglong.schemas.chat import (
     Output, Content, Usage, Action,
     StreamOutput, Delta
 )
+from menglong.schemas.model_info import ModelInfo
 from menglong.utils.config.config_type import ProviderConfig
 
 @ProviderRegistry.register("anthropic")
@@ -268,6 +269,40 @@ class AnthropicProvider(BaseProvider):
             else:
                 anthropic_tools.append(t)
         return anthropic_tools
+
+    def list_models(self) -> List[ModelInfo]:
+        """返回 Anthropic 当前可用的模型列表。
+        - native 模式：调用 Anthropic SDK 的 models.list()
+        - Bedrock 模式：通过 boto3 过滤 anthropic 开头的模型
+        """
+        # 判断是 native 还是 Bedrock
+        api_key = getattr(self.config, "api_key", None)
+        if api_key:  # native
+            if not self._native_client:
+                self._native_client = Anthropic(api_key=api_key)
+            return [
+                ModelInfo(
+                    id=m.id,
+                    provider=self.provider_name,
+                    display_name=getattr(m, "display_name", None),
+                )
+                for m in self._native_client.models.list()
+            ]
+        else:  # Bedrock
+            import boto3
+            region = getattr(self.config, "region", None) or "us-west-2"
+            bedrock = boto3.Session().client("bedrock", region_name=region)
+            resp = bedrock.list_foundation_models(byOutputModality="TEXT")
+            return [
+                ModelInfo(
+                    id=m["modelId"],
+                    provider=self.provider_name,
+                    display_name=m.get("modelName"),
+                )
+                for m in resp.get("modelSummaries", [])
+                if m["modelId"].startswith("anthropic.")
+                and m.get("modelLifecycle", {}).get("status") == "ACTIVE"
+            ]
 
     # ==========================================
     #         能力接口实现

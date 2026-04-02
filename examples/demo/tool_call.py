@@ -184,7 +184,7 @@ def deepseek_tool_call_demo():
     """Demo of tool calls using DeepSeek models"""
     # print_rule("DeepSeek Tool Call Demo", style="blue")
 
-    model = Model(default_model_id="deepseek/deepseek-chat")
+    model = Model(default_model_id="infinigence/claude-opus-4-6")
 
     # 使用 Context 管理对话状态
     from menglong.schemas.chat import Context

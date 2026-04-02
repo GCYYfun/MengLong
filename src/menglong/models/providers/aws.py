@@ -1,4 +1,4 @@
-from typing import List, Generator, Dict, Any, Optional,AsyncGenerator
+from typing import List, Generator, Dict, Any, Optional, AsyncGenerator
 import boto3
 import json
 import os
@@ -11,6 +11,7 @@ from menglong.schemas.chat import (
     Output, Content, Usage, Action,
     StreamOutput, Delta
 )
+from menglong.schemas.model_info import ModelInfo
 from menglong.utils.config.config_type import ProviderConfig
 
 @ProviderRegistry.register("aws")
@@ -223,6 +224,22 @@ class AWSProvider(BaseProvider):
             else:
                 aws_tools.append(t)
         return {'tools': aws_tools}
+
+    def list_models(self) -> List[ModelInfo]:
+        """返回 AWS Bedrock 当前可用的文本输出模型列表（仅 ACTIVE 状态）"""
+        region = getattr(self.config, "region", None) or "us-west-2"
+        bedrock = boto3.Session().client("bedrock", region_name=region)
+        resp = bedrock.list_foundation_models(byOutputModality="TEXT")
+        models = []
+        for m in resp.get("modelSummaries", []):
+            status = m.get("modelLifecycle", {}).get("status", "")
+            if status == "ACTIVE":
+                models.append(ModelInfo(
+                    id=m["modelId"],
+                    provider=self.provider_name,
+                    display_name=m.get("modelName"),
+                ))
+        return models
 
     # ==========================================
     #         能力接口实现
