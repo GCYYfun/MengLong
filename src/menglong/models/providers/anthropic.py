@@ -5,12 +5,19 @@ from anthropic import Anthropic, AnthropicBedrock, AsyncAnthropic, AsyncAnthropi
 from menglong.models.providers.base import BaseProvider
 from menglong.models.providers.registry import ProviderRegistry
 from menglong.schemas.chat import (
-    Message, Response, StreamResponse, 
-    Output, Content, Usage, Action,
-    StreamOutput, Delta
+    Message,
+    Response,
+    StreamResponse,
+    Output,
+    Content,
+    Usage,
+    Action,
+    StreamOutput,
+    Delta,
 )
 from menglong.schemas.model_info import ModelInfo
 from menglong.utils.config.config_type import ProviderConfig
+
 
 @ProviderRegistry.register("anthropic")
 class AnthropicProvider(BaseProvider):
@@ -18,7 +25,7 @@ class AnthropicProvider(BaseProvider):
     Unified Anthropic Provider
     内部自动识别并切换 Native (Anthropic API) 与 Bedrock (AWS) 客户端。
     """
-    
+
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         self._native_client = None
@@ -34,18 +41,24 @@ class AnthropicProvider(BaseProvider):
         """
         # 判断标准：包含 anthropic. 或者以 us./global. 开头
         is_bedrock = "anthropic." in model or model.startswith(("us.", "global."))
-        
+
         if is_bedrock:
             if not self._bedrock_client:
-                region = getattr(self.config, "region", None) or os.getenv("AWS_REGION", "us-west-2")
+                region = getattr(self.config, "region", None) or os.getenv(
+                    "AWS_REGION", "us-west-2"
+                )
                 # 支持 AWS 凭证透传
-                aws_access_key = getattr(self.config, "aws_access_key", os.getenv("AWS_ACCESS_KEY_ID"))
-                aws_secret_key = getattr(self.config, "aws_secret_key", os.getenv("AWS_SECRET_ACCESS_KEY"))
-                
+                aws_access_key = getattr(
+                    self.config, "aws_access_key", os.getenv("AWS_ACCESS_KEY_ID")
+                )
+                aws_secret_key = getattr(
+                    self.config, "aws_secret_key", os.getenv("AWS_SECRET_ACCESS_KEY")
+                )
+
                 self._bedrock_client = AnthropicBedrock(
                     aws_access_key=aws_access_key,
                     aws_secret_key=aws_secret_key,
-                    aws_region=region
+                    aws_region=region,
                 )
             return self._bedrock_client
         else:
@@ -53,25 +66,35 @@ class AnthropicProvider(BaseProvider):
                 api_key = self.config.api_key or os.getenv("ANTHROPIC_API_KEY")
                 if not api_key:
                     raise ValueError("Anthropic API key is missing for native call.")
-                self._native_client = Anthropic(api_key=api_key, base_url=self.config.base_url)
+                self._native_client = Anthropic(
+                    api_key=api_key, base_url=self.config.base_url
+                )
             return self._native_client
-    
-    def _get_async_client(self, model: str) -> Union[AsyncAnthropic, AsyncAnthropicBedrock]:
+
+    def _get_async_client(
+        self, model: str
+    ) -> Union[AsyncAnthropic, AsyncAnthropicBedrock]:
         """
         根据模型 ID 智能识别应使用的异步客户端类。
         """
         is_bedrock = "anthropic." in model or model.startswith(("us.", "global."))
-        
+
         if is_bedrock:
             if not self._async_bedrock_client:
-                region = getattr(self.config, "region", None) or os.getenv("AWS_REGION", "us-west-1")
-                aws_access_key = getattr(self.config, "aws_access_key", os.getenv("AWS_ACCESS_KEY_ID"))
-                aws_secret_key = getattr(self.config, "aws_secret_key", os.getenv("AWS_SECRET_ACCESS_KEY"))
-                
+                region = getattr(self.config, "region", None) or os.getenv(
+                    "AWS_REGION", "us-west-1"
+                )
+                aws_access_key = getattr(
+                    self.config, "aws_access_key", os.getenv("AWS_ACCESS_KEY_ID")
+                )
+                aws_secret_key = getattr(
+                    self.config, "aws_secret_key", os.getenv("AWS_SECRET_ACCESS_KEY")
+                )
+
                 self._async_bedrock_client = AsyncAnthropicBedrock(
                     aws_access_key=aws_access_key,
                     aws_secret_key=aws_secret_key,
-                    aws_region=region
+                    aws_region=region,
                 )
             return self._async_bedrock_client
         else:
@@ -79,17 +102,40 @@ class AnthropicProvider(BaseProvider):
                 api_key = self.config.api_key or os.getenv("ANTHROPIC_API_KEY")
                 if not api_key:
                     raise ValueError("Anthropic API key is missing for native call.")
-                self._async_native_client = AsyncAnthropic(api_key=api_key, base_url=self.config.base_url)
+                self._async_native_client = AsyncAnthropic(
+                    api_key=api_key, base_url=self.config.base_url
+                )
             return self._async_native_client
 
     def _convert_params(self, model: str, **kwargs) -> Dict[str, Any]:
         """[由内向外]：转换参数，并注入 Anthropic 强制要求的默认值"""
         params = super()._convert_params(model, **kwargs)
-        
-        # Anthropic SDK 强制要求 max_tokens
-        if "max_tokens" not in params:
-            params["max_tokens"] = 4096
-            
+
+        if not params.get("stream", False):
+            # Anthropic SDK 强制要求 max_tokens
+            if (
+                "max_tokens" not in params
+                and params.get("max_tokens") is None
+                or params.get("max_tokens") > 4096
+            ):
+                params["max_tokens"] = 4096  # 过大max_tokens会导致SDK让使用stream方式
+        else:
+            if "max_tokens" not in params and params.get("max_tokens") is None:
+                params["max_tokens"] = 64000  # 默认给大一点
+
+        # Anthropic 要求 tool_choice 必须是一个对象
+        if "tool_choice" in params:
+            tc = params["tool_choice"]
+            if isinstance(tc, str):
+                if tc.lower() == "required":
+                    params["tool_choice"] = {"type": "any"}
+                elif tc.lower() in ("auto", "any"):
+                    params["tool_choice"] = {"type": tc.lower()}
+                # 其它字符串（比如 tool name）不作通用转换，可能由外部自行保证
+            elif getattr(tc, "type", None) == "function":
+                # 防御性兼容：如果是 OpenAI 对象的 {"type": "function", "function": {"name": ...}}
+                pass
+
         return params
 
     # ==========================================
@@ -106,88 +152,100 @@ class AnthropicProvider(BaseProvider):
             role_val = msg.role.value if hasattr(msg.role, "value") else msg.role
             if role_val == "system":
                 continue
-            
+
             # Anthropic 不支持 tool 角色，工具结果必须放在 user 角色中
             if role_val == "tool":
                 role_val = "user"
-            
+
             content = msg.content
             if isinstance(content, list):
                 serialized_content = []
                 for part in content:
                     # part_type = getattr(part, "type", None) or (part.get("type") if isinstance(part, dict) else None)
-                    
+
                     if part.type == "text":
                         serialized_content.append({"type": "text", "text": part.text})
                     elif part.type == "image":
-                        if part.image_url:
-                            url = part.image_url.get("url", "") if isinstance(part.image_url, dict) else part.image_url
-                            serialized_content.append({
-                                "type": "image",
-                                "source": {
-                                    "type": "url",
-                                    "url": url
+                        image_url = getattr(part, "image_url", None)
+                        image_data = getattr(part, "data", None)
+                        if image_url:
+                            url = (
+                                image_url.get("url", "")
+                                if isinstance(image_url, dict)
+                                else image_url
+                            )
+                            serialized_content.append(
+                                {"type": "image", "source": {"type": "url", "url": url}}
+                            )
+                        elif image_data:
+                            serialized_content.append(
+                                {
+                                    "type": "image",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": getattr(
+                                            part, "media_type", "image/jpeg"
+                                        )
+                                        or "image/jpeg",
+                                        "data": image_data,
+                                    },
                                 }
-                            })
-                        elif part.data:
-                            serialized_content.append({
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": part.media_type or "image/jpeg",
-                                    "data": part.data
-                                }
-                            })
+                            )
                     elif part.type == "document":
                         # Anthropic 支持 PDF 文档
-                        serialized_content.append({
-                            "type": "document",
-                            "source": {
-                                "type": "base64",
-                                "media_type": part.media_type or "application/pdf",
-                                "data": part.data
+                        serialized_content.append(
+                            {
+                                "type": "document",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": part.media_type or "application/pdf",
+                                    "data": part.data,
+                                },
                             }
-                        })
+                        )
                     elif part.type == "audio":
                         # Anthropic 目前不支持音频输入
                         import warnings
+
                         warnings.warn(
                             "Anthropic API 目前不支持音频输入。音频内容将被忽略。",
-                            UserWarning
+                            UserWarning,
                         )
                         continue
                     elif part.type == "video":
                         # Anthropic 目前不支持视频输入
                         import warnings
+
                         warnings.warn(
                             "Anthropic API 目前不支持视频输入。视频内容将被忽略。",
-                            UserWarning
+                            UserWarning,
                         )
                         continue
                     elif part.type == "action":
-                        serialized_content.append({
-                            "type": "tool_use",
-                            "id": part.id,
-                            "name": part.name,
-                            "input": part.arguments
-                        })
+                        serialized_content.append(
+                            {
+                                "type": "tool_use",
+                                "id": part.id,
+                                "name": part.name,
+                                "input": part.arguments,
+                            }
+                        )
                     elif part.type == "outcome":
-                        serialized_content.append({
-                            "type": "tool_result",
-                            "tool_use_id": part.id,
-                            "content": part.result,
-                            # "is_error": part.is_error
-                        })
+                        serialized_content.append(
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": part.id,
+                                "content": part.result,
+                                # "is_error": part.is_error
+                            }
+                        )
                     elif hasattr(part, "model_dump"):
                         serialized_content.append(part.model_dump(exclude_none=True))
                     else:
                         serialized_content.append(part)
                 content = serialized_content
-            
-            anthropic_msgs.append({
-                "role": role_val,
-                "content": content
-            })
+
+            anthropic_msgs.append({"role": role_val, "content": content})
         return anthropic_msgs
 
     def _normalize_response(self, response: Any, model: str) -> Response:
@@ -198,32 +256,32 @@ class AnthropicProvider(BaseProvider):
             if hasattr(block, "text"):
                 text_content += block.text
             elif hasattr(block, "type") and block.type == "tool_use":
-                actions.append(Action(
-                    id=block.id,
-                    name=block.name,
-                    arguments=block.input
-                ))
+                actions.append(
+                    Action(id=block.id, name=block.name, arguments=block.input)
+                )
             elif isinstance(block, dict):
                 if block.get("type") == "text":
                     text_content += block.get("text", "")
                 elif block.get("type") == "tool_use":
-                    actions.append(Action(
-                        id=block.get("id"),
-                        name=block.get("name"),
-                        arguments=block.get("input")
-                    ))
+                    actions.append(
+                        Action(
+                            id=block.get("id"),
+                            name=block.get("name"),
+                            arguments=block.get("input"),
+                        )
+                    )
 
         content_obj = Content(text=text_content if text_content else None)
         output = Output(
             content=content_obj,
             actions=actions if actions else None,
-            status=getattr(response, "stop_reason", None)
+            status=getattr(response, "stop_reason", None),
         )
 
         usage = Usage(
             input_tokens=response.usage.input_tokens,
             output_tokens=response.usage.output_tokens,
-            total_tokens=response.usage.input_tokens + response.usage.output_tokens
+            total_tokens=response.usage.input_tokens + response.usage.output_tokens,
         )
         return Response(output=output, model=model, usage=usage)
 
@@ -243,13 +301,13 @@ class AnthropicProvider(BaseProvider):
             if hasattr(chunk, "usage"):
                 usage = Usage(
                     output_tokens=getattr(chunk.usage, "output_tokens", 0),
-                    total_tokens=getattr(chunk.usage, "output_tokens", 0)
+                    total_tokens=getattr(chunk.usage, "output_tokens", 0),
                 )
         elif chunk_type == "message_start":
             if hasattr(chunk.message, "usage"):
                 usage = Usage(
                     input_tokens=chunk.message.usage.input_tokens,
-                    total_tokens=chunk.message.usage.input_tokens
+                    total_tokens=chunk.message.usage.input_tokens,
                 )
 
         delta_obj = Delta(text=delta_text)
@@ -261,11 +319,36 @@ class AnthropicProvider(BaseProvider):
         anthropic_tools = []
         for t in tools:
             if hasattr(t, "function"):
-                anthropic_tools.append({
-                    "name": t.function.name,
-                    "description": t.function.description,
-                    "input_schema": t.function.parameters
-                })
+                anthropic_tools.append(
+                    {
+                        "name": t.function.name,
+                        "description": t.function.description,
+                        "input_schema": t.function.parameters,
+                    }
+                )
+            elif isinstance(t, dict):
+                if "function" in t:
+                    func = t["function"]
+                    anthropic_tools.append(
+                        {
+                            "name": func.get("name", ""),
+                            "description": func.get("description", ""),
+                            "input_schema": func.get(
+                                "parameters", {"type": "object", "properties": {}}
+                            ),
+                        }
+                    )
+                else:
+                    anthropic_tools.append(
+                        {
+                            "name": t.get("name", ""),
+                            "description": t.get("description", ""),
+                            "input_schema": t.get("input_schema")
+                            or t.get(
+                                "parameters", {"type": "object", "properties": {}}
+                            ),
+                        }
+                    )
             else:
                 anthropic_tools.append(t)
         return anthropic_tools
@@ -290,6 +373,7 @@ class AnthropicProvider(BaseProvider):
             ]
         else:  # Bedrock
             import boto3
+
             region = getattr(self.config, "region", None) or "us-west-2"
             bedrock = boto3.Session().client("bedrock", region_name=region)
             resp = bedrock.list_foundation_models(byOutputModality="TEXT")
@@ -311,10 +395,10 @@ class AnthropicProvider(BaseProvider):
     def chat(self, messages: List[Message], model: str, **kwargs) -> Response:
         params = self._convert_params(model, **kwargs)
         client = self._get_client(model)
-        
+
         # 处理工具转换 (MengLong Standard -> Anthropic Format)
         if "tools" in params:
-             params["tools"] = self._convert_tools(params["tools"])
+            params["tools"] = self._convert_tools(params["tools"])
 
         # 提取系统提示词
         system_prompt = ""
@@ -328,17 +412,19 @@ class AnthropicProvider(BaseProvider):
             model=model,
             messages=self._convert_messages(messages),
             system=system_prompt,
-            **params
+            **params,
         )
         return self._normalize_response(response, model)
 
-    def stream_chat(self, messages: List[Message], model: str, **kwargs) -> Generator[StreamResponse, None, None]:
+    def stream_chat(
+        self, messages: List[Message], model: str, **kwargs
+    ) -> Generator[StreamResponse, None, None]:
         params = self._convert_params(model, **kwargs)
         client = self._get_client(model)
-        
+
         # 处理工具转换
         if "tools" in params:
-             params["tools"] = self._convert_tools(params["tools"])
+            params["tools"] = self._convert_tools(params["tools"])
 
         # 提取系统提示词
         system_prompt = ""
@@ -352,7 +438,7 @@ class AnthropicProvider(BaseProvider):
             model=model,
             messages=self._convert_messages(messages),
             system=system_prompt,
-            **params
+            **params,
         ) as stream:
             for event in stream:
                 yield self._normalize_stream_chunk(event, model)
@@ -361,13 +447,15 @@ class AnthropicProvider(BaseProvider):
     #         异步能力接口实现
     # ==========================================
 
-    async def async_chat(self, messages: List[Message], model: str, **kwargs) -> Response:
+    async def async_chat(
+        self, messages: List[Message], model: str, **kwargs
+    ) -> Response:
         params = self._convert_params(model, **kwargs)
         client = self._get_async_client(model)
-        
+
         # 处理工具转换 (MengLong Standard -> Anthropic Format)
         if "tools" in params:
-             params["tools"] = self._convert_tools(params["tools"])
+            params["tools"] = self._convert_tools(params["tools"])
 
         # 提取系统提示词
         system_prompt = ""
@@ -381,17 +469,19 @@ class AnthropicProvider(BaseProvider):
             model=model,
             messages=self._convert_messages(messages),
             system=system_prompt,
-            **params
+            **params,
         )
         return self._normalize_response(response, model)
 
-    async def async_stream_chat(self, messages: List[Message], model: str, **kwargs) -> AsyncGenerator[StreamResponse, None]:
+    async def async_stream_chat(
+        self, messages: List[Message], model: str, **kwargs
+    ) -> AsyncGenerator[StreamResponse, None]:
         params = self._convert_params(model, **kwargs)
         client = self._get_async_client(model)
-        
+
         # 处理工具转换
         if "tools" in params:
-             params["tools"] = self._convert_tools(params["tools"])
+            params["tools"] = self._convert_tools(params["tools"])
 
         # 提取系统提示词
         system_prompt = ""
@@ -405,7 +495,7 @@ class AnthropicProvider(BaseProvider):
             model=model,
             messages=self._convert_messages(messages),
             system=system_prompt,
-            **params
+            **params,
         ) as stream:
             async for event in stream:
                 yield self._normalize_stream_chunk(event, model)

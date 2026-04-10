@@ -7,9 +7,15 @@ import openai
 from menglong.models.providers.base import BaseProvider
 from menglong.models.providers.registry import ProviderRegistry
 from menglong.schemas.chat import (
-    Message, Response, StreamResponse,
-    Output, Content, Usage, Action,
-    StreamOutput, Delta,
+    Message,
+    Response,
+    StreamResponse,
+    Output,
+    Content,
+    Usage,
+    Action,
+    StreamOutput,
+    Delta,
 )
 from menglong.schemas.model_info import ModelInfo
 from menglong.utils.config.config_type import ProviderConfig
@@ -25,7 +31,9 @@ class OpenAIProvider(BaseProvider):
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         self.client = openai.OpenAI(api_key=config.api_key, base_url=config.base_url)
-        self.async_client = openai.AsyncOpenAI(api_key=config.api_key, base_url=config.base_url)
+        self.async_client = openai.AsyncOpenAI(
+            api_key=config.api_key, base_url=config.base_url
+        )
 
     # ==========================================
     #         消息转换（私有辅助方法）
@@ -34,7 +42,9 @@ class OpenAIProvider(BaseProvider):
     @staticmethod
     def _get_part_type(part) -> Optional[str]:
         """统一获取 ContentPart 的 type 字段"""
-        return getattr(part, "type", None) or (part.get("type") if isinstance(part, dict) else None)
+        return getattr(part, "type", None) or (
+            part.get("type") if isinstance(part, dict) else None
+        )
 
     def _serialize_content_parts(self, parts: list) -> list:
         """将 ContentPart 列表序列化为 OpenAI 兼容格式（跳过工具相关和不支持的类型）"""
@@ -47,7 +57,11 @@ class OpenAIProvider(BaseProvider):
 
             elif part_type == "image":
                 if getattr(part, "image_url", None):
-                    img_data = part.image_url.copy() if isinstance(part.image_url, dict) else {"url": part.image_url}
+                    img_data = (
+                        part.image_url.copy()
+                        if isinstance(part.image_url, dict)
+                        else {"url": part.image_url}
+                    )
                 elif getattr(part, "data", None):
                     mime = getattr(part, "media_type", "image/jpeg")
                     img_data = {"url": f"data:{mime};base64,{part.data}"}
@@ -61,13 +75,15 @@ class OpenAIProvider(BaseProvider):
             elif part_type == "audio":
                 warnings.warn(
                     "OpenAI Chat Completions API 不支持音频输入。如需音频转录，请使用 Whisper API。音频内容将被忽略。",
-                    UserWarning, stacklevel=3,
+                    UserWarning,
+                    stacklevel=3,
                 )
 
             elif part_type == "video":
                 warnings.warn(
                     "OpenAI Chat Completions API 不支持视频输入。视频内容将被忽略。",
-                    UserWarning, stacklevel=3,
+                    UserWarning,
+                    stacklevel=3,
                 )
 
             elif part_type in ("action", "outcome"):
@@ -106,7 +122,9 @@ class OpenAIProvider(BaseProvider):
             m["tool_call_id"] = tool_call_id
         return m
 
-    def _serialize_assistant_msg(self, m: Dict[str, Any], content_parts: list, raw_parts: list) -> Dict[str, Any]:
+    def _serialize_assistant_msg(
+        self, m: Dict[str, Any], content_parts: list, raw_parts: list
+    ) -> Dict[str, Any]:
         """补充 assistant 消息的 tool_calls 字段，并在全为工具调用时将 content 置 None"""
         tool_calls = [
             {
@@ -126,12 +144,18 @@ class OpenAIProvider(BaseProvider):
         ]
         if tool_calls:
             m["tool_calls"] = tool_calls
-            has_text = any(
-                isinstance(p, dict) and p.get("type") == "text"
-                for p in content_parts
-            ) if isinstance(content_parts, list) else False
+            has_text = (
+                any(
+                    isinstance(p, dict) and p.get("type") == "text"
+                    for p in content_parts
+                )
+                if isinstance(content_parts, list)
+                else False
+            )
             if not has_text:
-                m["content"] = None
+                # 不设 content=None，而是直接删除 key：
+                # Bedrock/Infinigence 代理会把 null content 转成空文本块，导致 ValidationException
+                m.pop("content", None)
         return m
 
     # ==========================================
@@ -166,13 +190,29 @@ class OpenAIProvider(BaseProvider):
 
     def _convert_tools(self, tools: List[Any]) -> List[Dict[str, Any]]:
         """将标准化工具转换为 OpenAI 格式"""
-        return [t.model_dump(exclude_none=True) if hasattr(t, "model_dump") else t for t in tools]
+        openai_tools = []
+        for t in tools:
+            if hasattr(t, "model_dump"):
+                openai_tools.append(t.model_dump(exclude_none=True))
+            elif isinstance(t, dict):
+                if "type" in t and "function" in t:
+                    openai_tools.append(t)
+                else:
+                    # Flat dict format, wrap it
+                    openai_tools.append({"type": "function", "function": t})
+            else:
+                openai_tools.append(t)
+        return openai_tools
 
     def list_models(self) -> List[ModelInfo]:
         """返回该 Provider 当前可用的模型列表"""
         raw = self.client.models.list()
         return [
-            ModelInfo(id=m.id, provider=self.provider_name, created_at=getattr(m, "created", None))
+            ModelInfo(
+                id=m.id,
+                provider=self.provider_name,
+                created_at=getattr(m, "created", None),
+            )
             for m in raw
         ]
 
@@ -210,7 +250,11 @@ class OpenAIProvider(BaseProvider):
             actions=actions,
             status=choice.finish_reason,
         )
-        return Response(output=output, model=response.model, usage=self._normalize_usage(response.usage))
+        return Response(
+            output=output,
+            model=response.model,
+            usage=self._normalize_usage(response.usage),
+        )
 
     def _normalize_stream_chunk(self, chunk: Any, model: str) -> StreamResponse:
         """将 OpenAI 流式碎片归一化"""
@@ -222,7 +266,11 @@ class OpenAIProvider(BaseProvider):
             delta=Delta(text=delta.content),
             end=chunk.choices[0].finish_reason,
         )
-        return StreamResponse(output=stream_output, model=chunk.model, usage=self._normalize_usage(getattr(chunk, "usage", None)))
+        return StreamResponse(
+            output=stream_output,
+            model=chunk.model,
+            usage=self._normalize_usage(getattr(chunk, "usage", None)),
+        )
 
     # ==========================================
     #         能力接口（公开方法）
@@ -233,6 +281,18 @@ class OpenAIProvider(BaseProvider):
         params = self._convert_params(model, **kwargs)
         if "tools" in params:
             params["tools"] = self._convert_tools(params["tools"])
+            
+        if "tool_choice" in params:
+            tc = params["tool_choice"]
+            if isinstance(tc, dict) and "type" in tc:
+                tc_type = tc["type"]
+                if tc_type in ("auto", "none", "required"):
+                    params["tool_choice"] = tc_type
+                elif tc_type == "any":
+                    params["tool_choice"] = "required"
+                elif tc_type == "tool" and "name" in tc:
+                    params["tool_choice"] = {"type": "function", "function": {"name": tc["name"]}}
+                    
         return params
 
     def chat(self, messages: List[Message], model: str, **kwargs) -> Response:
@@ -242,25 +302,37 @@ class OpenAIProvider(BaseProvider):
         )
         return self._normalize_response(response, model)
 
-    def stream_chat(self, messages: List[Message], model: str, **kwargs) -> Generator[StreamResponse, None, None]:
+    def stream_chat(
+        self, messages: List[Message], model: str, **kwargs
+    ) -> Generator[StreamResponse, None, None]:
         params = self._prepare_params(model, **kwargs)
         stream = self.client.chat.completions.create(
-            model=model, messages=self._convert_messages(messages), stream=True, **params
+            model=model,
+            messages=self._convert_messages(messages),
+            stream=True,
+            **params,
         )
         for chunk in stream:
             yield self._normalize_stream_chunk(chunk, model)
 
-    async def async_chat(self, messages: List[Message], model: str, **kwargs) -> Response:
+    async def async_chat(
+        self, messages: List[Message], model: str, **kwargs
+    ) -> Response:
         params = self._prepare_params(model, **kwargs)
         response = await self.async_client.chat.completions.create(
             model=model, messages=self._convert_messages(messages), **params
         )
         return self._normalize_response(response, model)
 
-    async def async_stream_chat(self, messages: List[Message], model: str, **kwargs) -> AsyncGenerator[StreamResponse, None]:
+    async def async_stream_chat(
+        self, messages: List[Message], model: str, **kwargs
+    ) -> AsyncGenerator[StreamResponse, None]:
         params = self._prepare_params(model, **kwargs)
         stream = await self.async_client.chat.completions.create(
-            model=model, messages=self._convert_messages(messages), stream=True, **params
+            model=model,
+            messages=self._convert_messages(messages),
+            stream=True,
+            **params,
         )
         async for chunk in stream:
             yield self._normalize_stream_chunk(chunk, model)
