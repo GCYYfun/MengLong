@@ -281,7 +281,7 @@ class OpenAIProvider(BaseProvider):
         params = self._convert_params(model, **kwargs)
         if "tools" in params:
             params["tools"] = self._convert_tools(params["tools"])
-            
+
         if "tool_choice" in params:
             tc = params["tool_choice"]
             if isinstance(tc, dict) and "type" in tc:
@@ -291,8 +291,11 @@ class OpenAIProvider(BaseProvider):
                 elif tc_type == "any":
                     params["tool_choice"] = "required"
                 elif tc_type == "tool" and "name" in tc:
-                    params["tool_choice"] = {"type": "function", "function": {"name": tc["name"]}}
-                    
+                    params["tool_choice"] = {
+                        "type": "function",
+                        "function": {"name": tc["name"]},
+                    }
+
         return params
 
     def chat(self, messages: List[Message], model: str, **kwargs) -> Response:

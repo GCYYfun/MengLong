@@ -6,12 +6,19 @@ import base64
 from menglong.models.providers.base import BaseProvider
 from menglong.models.providers.registry import ProviderRegistry
 from menglong.schemas.chat import (
-    Message, Response, StreamResponse, 
-    Output, Content, Usage, Action,
-    StreamOutput, Delta
+    Message,
+    Response,
+    StreamResponse,
+    Output,
+    Content,
+    Usage,
+    Action,
+    StreamOutput,
+    Delta,
 )
 from menglong.schemas.model_info import ModelInfo
 from menglong.utils.config.config_type import ProviderConfig
+
 
 @ProviderRegistry.register("google")
 class GoogleProvider(BaseProvider):
@@ -19,31 +26,30 @@ class GoogleProvider(BaseProvider):
     Google Gemini Provider
     基于最新的 google-genai SDK 实现。
     """
-    
+
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
-        
+
         # 优先检查是否为 Vertex AI 模式
         vertexai = getattr(config, "vertexai", False)
-        
+
         if vertexai:
             credentials = getattr(config, "google_application_credentials")
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials
             project = getattr(config, "project", os.getenv("GOOGLE_CLOUD_PROJECT"))
-            location = getattr(config, "location", "global") # 默认 location
+            location = getattr(config, "location", "global")  # 默认 location
             self.client = genai.Client(
-                vertexai=True, 
-                project=project, 
-                location=location
+                vertexai=True, project=project, location=location
             )
         else:
             api_key = config.api_key or os.getenv("GOOGLE_API_KEY")
             if not api_key:
-                raise ValueError("Google API key is missing. Set 'api_key' in config or 'GOOGLE_API_KEY' env var.")
-                
+                raise ValueError(
+                    "Google API key is missing. Set 'api_key' in config or 'GOOGLE_API_KEY' env var."
+                )
+
             self.client = genai.Client(
-                api_key=api_key,
-                http_options={'api_version': 'v1beta'}
+                api_key=api_key, http_options={"api_version": "v1beta"}
             )
 
     # ==========================================
@@ -53,21 +59,21 @@ class GoogleProvider(BaseProvider):
     def _convert_params(self, model: str, **kwargs) -> Dict[str, Any]:
         """
         覆盖基类方法，添加 Google 特定的参数映射。
-        
+
         Google GenAI SDK 使用不同的参数名称:
         - max_tokens → max_output_tokens
         - stop → stop_sequences
         """
         # 先调用基类方法获取合并后的参数
         params = super()._convert_params(model, **kwargs)
-        
+
         # 参数名称映射
         if "max_tokens" in params:
             params["max_output_tokens"] = params.pop("max_tokens")
-        
+
         if "stop" in params:
             params["stop_sequences"] = params.pop("stop")
-        
+
         return params
 
     def _convert_messages(self, messages: List[Message]) -> List[types.Content]:
@@ -79,17 +85,17 @@ class GoogleProvider(BaseProvider):
         contents = []
         for msg in messages:
             role_val = msg.role.value if hasattr(msg.role, "value") else msg.role
-            
+
             # 系统消息在 generate_content 的 system_instruction 中处理
             if role_val == "system":
                 continue
-                
+
             # 映射角色
             genai_role = "model" if role_val == "assistant" else "user"
-            
+
             content_val = msg.content
             google_parts = []
-            
+
             if isinstance(content_val, str):
                 google_parts.append(types.Part(text=content_val))
             elif isinstance(content_val, list):
@@ -99,29 +105,72 @@ class GoogleProvider(BaseProvider):
                             google_parts.append(types.Part(text=part.text))
                         elif part.type == "image":
                             if part.image_url:
-                                url = part.image_url.get("url", "") if isinstance(part.image_url, dict) else part.image_url
-                                google_parts.append(types.Part.from_uri(file_uri=url, mime_type=part.media_type or "image/jpeg"))
+                                url = (
+                                    part.image_url.get("url", "")
+                                    if isinstance(part.image_url, dict)
+                                    else part.image_url
+                                )
+                                google_parts.append(
+                                    types.Part.from_uri(
+                                        file_uri=url,
+                                        mime_type=part.media_type or "image/jpeg",
+                                    )
+                                )
                             elif part.data:
-                                google_parts.append(types.Part.from_bytes(data=base64.b64decode(part.data), mime_type=part.media_type or "image/jpeg"))
+                                google_parts.append(
+                                    types.Part.from_bytes(
+                                        data=base64.b64decode(part.data),
+                                        mime_type=part.media_type or "image/jpeg",
+                                    )
+                                )
                         elif part.type == "document":
-                            google_parts.append(types.Part.from_bytes(data=base64.b64decode(part.data), mime_type=part.media_type or "application/pdf"))
+                            google_parts.append(
+                                types.Part.from_bytes(
+                                    data=base64.b64decode(part.data),
+                                    mime_type=part.media_type or "application/pdf",
+                                )
+                            )
                         elif part.type == "audio":
                             # Gemini 2.0 Flash 支持音频
                             if part.audio_url:
-                                google_parts.append(types.Part.from_uri(file_uri=part.audio_url, mime_type=part.media_type or "audio/mp3"))
+                                google_parts.append(
+                                    types.Part.from_uri(
+                                        file_uri=part.audio_url,
+                                        mime_type=part.media_type or "audio/mp3",
+                                    )
+                                )
                             elif part.data:
-                                google_parts.append(types.Part.from_bytes(data=base64.b64decode(part.data), mime_type=part.media_type or "audio/mp3"))
+                                google_parts.append(
+                                    types.Part.from_bytes(
+                                        data=base64.b64decode(part.data),
+                                        mime_type=part.media_type or "audio/mp3",
+                                    )
+                                )
                         elif part.type == "video":
                             # Gemini 2.0 Flash 支持视频
                             if part.video_url:
-                                google_parts.append(types.Part.from_uri(file_uri=part.video_url, mime_type=part.media_type or "video/mp4"))
+                                google_parts.append(
+                                    types.Part.from_uri(
+                                        file_uri=part.video_url,
+                                        mime_type=part.media_type or "video/mp4",
+                                    )
+                                )
                             elif part.data:
-                                google_parts.append(types.Part.from_bytes(data=base64.b64decode(part.data), mime_type=part.media_type or "video/mp4"))
+                                google_parts.append(
+                                    types.Part.from_bytes(
+                                        data=base64.b64decode(part.data),
+                                        mime_type=part.media_type or "video/mp4",
+                                    )
+                                )
                         elif part.type == "action":
-                            google_parts.append(types.Part(function_call=types.FunctionCall(
-                                name=part.name,
-                                args=part.arguments)
-                            ,thought_signature=part.id))
+                            google_parts.append(
+                                types.Part(
+                                    function_call=types.FunctionCall(
+                                        name=part.name, args=part.arguments
+                                    ),
+                                    thought_signature=part.id,
+                                )
+                            )
                         elif part.type == "outcome":
                             # Google 要求 function_response 的 response 必须是字典
                             res = part.result
@@ -130,35 +179,33 @@ class GoogleProvider(BaseProvider):
                                     res = json.loads(res)
                                 except:
                                     pass
-                            
+
                             if not isinstance(res, dict):
                                 res = {"result": res}
-                                
-                            google_parts.append(types.Part.from_function_response(
-                                name=part.name,
-                                response=res
-                            ))
+
+                            google_parts.append(
+                                types.Part.from_function_response(
+                                    name=part.name, response=res
+                                )
+                            )
                         else:
                             # 兜底转换
                             google_parts.append(types.Part(text=str(part)))
                     else:
                         # 兼容普通字典
                         if isinstance(part, dict) and "text" in part:
-                             google_parts.append(types.Part(text=part["text"]))
+                            google_parts.append(types.Part(text=part["text"]))
                         else:
-                             google_parts.append(types.Part(text=str(part)))
-            
-            contents.append(types.Content(
-                role=genai_role,
-                parts=google_parts
-            ))
+                            google_parts.append(types.Part(text=str(part)))
+
+            contents.append(types.Content(role=genai_role, parts=google_parts))
         return contents
 
     def _normalize_response(self, response: Any, model: str) -> Response:
         """归一化 Google GenAI 同步响应"""
         text_content = ""
         actions = []
-        
+
         if response.candidates:
             candidate = response.candidates[0]
             if candidate.content and candidate.content.parts:
@@ -166,17 +213,21 @@ class GoogleProvider(BaseProvider):
                     if hasattr(part, "text") and part.text:
                         text_content += part.text
                     elif hasattr(part, "function_call") and part.function_call:
-                        actions.append(Action(
-                            id=part.thought_signature,
-                            name=part.function_call.name,
-                            arguments=part.function_call.args,
-                        ))
+                        actions.append(
+                            Action(
+                                id=part.thought_signature,
+                                name=part.function_call.name,
+                                arguments=part.function_call.args,
+                            )
+                        )
 
         content_obj = Content(text=text_content if text_content else None)
         output = Output(
             content=content_obj,
             actions=actions if actions else None,
-            status=str(response.candidates[0].finish_reason) if response.candidates else None
+            status=str(response.candidates[0].finish_reason)
+            if response.candidates
+            else None,
         )
 
         # 提取消耗
@@ -185,7 +236,7 @@ class GoogleProvider(BaseProvider):
             usage = Usage(
                 input_tokens=response.usage_metadata.prompt_token_count,
                 output_tokens=response.usage_metadata.candidates_token_count,
-                total_tokens=response.usage_metadata.total_token_count
+                total_tokens=response.usage_metadata.total_token_count,
             )
 
         return Response(output=output, model=model, usage=usage)
@@ -194,22 +245,19 @@ class GoogleProvider(BaseProvider):
         """归一化 Google GenAI 流式碎片"""
         text = chunk.text
         delta_obj = Delta(text=text)
-        
+
         finish_reason = None
         if chunk.candidates:
             finish_reason = str(chunk.candidates[0].finish_reason)
 
-        stream_output = StreamOutput(
-            delta=delta_obj,
-            end=finish_reason
-        )
+        stream_output = StreamOutput(delta=delta_obj, end=finish_reason)
 
         usage = None
         if hasattr(chunk, "usage_metadata"):
-             usage = Usage(
+            usage = Usage(
                 input_tokens=chunk.usage_metadata.prompt_token_count,
                 output_tokens=chunk.usage_metadata.candidates_token_count,
-                total_tokens=chunk.usage_metadata.total_token_count
+                total_tokens=chunk.usage_metadata.total_token_count,
             )
 
         return StreamResponse(output=stream_output, model=model, usage=usage)
@@ -219,17 +267,21 @@ class GoogleProvider(BaseProvider):
         functions = []
         for t in tools:
             if hasattr(t, "function"):
-                functions.append(types.FunctionDeclaration(
-                    name=t.function.name,
-                    description=t.function.description,
-                    parameters=t.function.parameters
-                ))
+                functions.append(
+                    types.FunctionDeclaration(
+                        name=t.function.name,
+                        description=t.function.description,
+                        parameters=t.function.parameters,
+                    )
+                )
             elif isinstance(t, dict) and "function" in t:
-                functions.append(types.FunctionDeclaration(
-                    name=t["function"]["name"],
-                    description=t["function"]["description"],
-                    parameters=t["function"]["parameters"]
-                ))
+                functions.append(
+                    types.FunctionDeclaration(
+                        name=t["function"]["name"],
+                        description=t["function"]["description"],
+                        parameters=t["function"]["parameters"],
+                    )
+                )
             else:
                 functions.append(t)
         if functions:
@@ -244,11 +296,13 @@ class GoogleProvider(BaseProvider):
             supported = getattr(m, "supported_actions", []) or []
             if "generateContent" not in supported:
                 continue
-            result.append(ModelInfo(
-                id=m.name,  # google 的 name 即是模型 ID
-                provider=self.provider_name,
-                display_name=getattr(m, "display_name", None),
-            ))
+            result.append(
+                ModelInfo(
+                    id=m.name,  # google 的 name 即是模型 ID
+                    provider=self.provider_name,
+                    display_name=getattr(m, "display_name", None),
+                )
+            )
         return result
 
     # ==========================================
@@ -257,7 +311,7 @@ class GoogleProvider(BaseProvider):
 
     def chat(self, messages: List[Message], model: str, **kwargs) -> Response:
         params = self._convert_params(model, **kwargs)
-        
+
         # 提取系统指令
         system_instruction = None
         for m in messages:
@@ -265,23 +319,25 @@ class GoogleProvider(BaseProvider):
             if role_val == "system":
                 system_instruction = m.content
                 break
-        
+
         if system_instruction:
             params["system_instruction"] = system_instruction
 
         if "tools" in params:
-             params["tools"] = self._convert_tools(params["tools"])
+            params["tools"] = self._convert_tools(params["tools"])
 
         response = self.client.models.generate_content(
             model=model,
             contents=self._convert_messages(messages),
-            config=types.GenerateContentConfig(**params)
+            config=types.GenerateContentConfig(**params),
         )
         return self._normalize_response(response, model)
 
-    def stream_chat(self, messages: List[Message], model: str, **kwargs) -> Generator[StreamResponse, None, None]:
+    def stream_chat(
+        self, messages: List[Message], model: str, **kwargs
+    ) -> Generator[StreamResponse, None, None]:
         params = self._convert_params(model, **kwargs)
-        
+
         # 处理工具转换 (MengLong Standard -> Google GenAI Spec)
         google_tools = None
         if "tools" in params:
@@ -289,20 +345,24 @@ class GoogleProvider(BaseProvider):
             other_tools = []
             for t in params.pop("tools"):
                 if hasattr(t, "function"):
-                    decls.append(types.FunctionDeclaration(
-                        name=t.function.name,
-                        description=t.function.description,
-                        parameters=t.function.parameters
-                    ))
+                    decls.append(
+                        types.FunctionDeclaration(
+                            name=t.function.name,
+                            description=t.function.description,
+                            parameters=t.function.parameters,
+                        )
+                    )
                 elif isinstance(t, dict) and "function" in t:
-                    decls.append(types.FunctionDeclaration(
-                        name=t["function"]["name"],
-                        description=t["function"]["description"],
-                        parameters=t["function"]["parameters"]
-                    ))
+                    decls.append(
+                        types.FunctionDeclaration(
+                            name=t["function"]["name"],
+                            description=t["function"]["description"],
+                            parameters=t["function"]["parameters"],
+                        )
+                    )
                 else:
                     other_tools.append(t)
-            
+
             google_tools = []
             if decls:
                 google_tools.append(types.Tool(function_declarations=decls))
@@ -319,12 +379,10 @@ class GoogleProvider(BaseProvider):
             model=model,
             contents=self._convert_messages(messages),
             config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                tools=google_tools,
-                **params
-            )
+                system_instruction=system_instruction, tools=google_tools, **params
+            ),
         )
-        
+
         for chunk in response:
             yield self._normalize_stream_chunk(chunk, model)
 
@@ -332,9 +390,11 @@ class GoogleProvider(BaseProvider):
     #         异步能力接口实现
     # ==========================================
 
-    async def async_chat(self, messages: List[Message], model: str, **kwargs) -> Response:
+    async def async_chat(
+        self, messages: List[Message], model: str, **kwargs
+    ) -> Response:
         params = self._convert_params(model, **kwargs)
-        
+
         # 提取系统指令
         system_instruction = None
         for m in messages:
@@ -342,23 +402,25 @@ class GoogleProvider(BaseProvider):
             if role_val == "system":
                 system_instruction = m.content
                 break
-        
+
         if system_instruction:
             params["system_instruction"] = system_instruction
 
         if "tools" in params:
-             params["tools"] = self._convert_tools(params["tools"])
+            params["tools"] = self._convert_tools(params["tools"])
 
         response = await self.client.aio.models.generate_content(
             model=model,
             contents=self._convert_messages(messages),
-            config=types.GenerateContentConfig(**params)
+            config=types.GenerateContentConfig(**params),
         )
         return self._normalize_response(response, model)
 
-    async def async_stream_chat(self, messages: List[Message], model: str, **kwargs) -> AsyncGenerator[StreamResponse, None]:
+    async def async_stream_chat(
+        self, messages: List[Message], model: str, **kwargs
+    ) -> AsyncGenerator[StreamResponse, None]:
         params = self._convert_params(model, **kwargs)
-        
+
         # 处理工具转换 (MengLong Standard -> Google GenAI Spec)
         google_tools = None
         if "tools" in params:
@@ -366,20 +428,24 @@ class GoogleProvider(BaseProvider):
             other_tools = []
             for t in params.pop("tools"):
                 if hasattr(t, "function"):
-                    decls.append(types.FunctionDeclaration(
-                        name=t.function.name,
-                        description=t.function.description,
-                        parameters=t.function.parameters
-                    ))
+                    decls.append(
+                        types.FunctionDeclaration(
+                            name=t.function.name,
+                            description=t.function.description,
+                            parameters=t.function.parameters,
+                        )
+                    )
                 elif isinstance(t, dict) and "function" in t:
-                    decls.append(types.FunctionDeclaration(
-                        name=t["function"]["name"],
-                        description=t["function"]["description"],
-                        parameters=t["function"]["parameters"]
-                    ))
+                    decls.append(
+                        types.FunctionDeclaration(
+                            name=t["function"]["name"],
+                            description=t["function"]["description"],
+                            parameters=t["function"]["parameters"],
+                        )
+                    )
                 else:
                     other_tools.append(t)
-            
+
             google_tools = []
             if decls:
                 google_tools.append(types.Tool(function_declarations=decls))
@@ -396,11 +462,9 @@ class GoogleProvider(BaseProvider):
             model=model,
             contents=self._convert_messages(messages),
             config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                tools=google_tools,
-                **params
-            )
+                system_instruction=system_instruction, tools=google_tools, **params
+            ),
         )
-        
+
         async for chunk in response:
             yield self._normalize_stream_chunk(chunk, model)

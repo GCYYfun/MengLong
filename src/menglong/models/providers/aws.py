@@ -7,12 +7,19 @@ import base64
 from menglong.models.providers.base import BaseProvider
 from menglong.models.providers.registry import ProviderRegistry
 from menglong.schemas.chat import (
-    Message, Response, StreamResponse, 
-    Output, Content, Usage, Action,
-    StreamOutput, Delta
+    Message,
+    Response,
+    StreamResponse,
+    Output,
+    Content,
+    Usage,
+    Action,
+    StreamOutput,
+    Delta,
 )
 from menglong.schemas.model_info import ModelInfo
 from menglong.utils.config.config_type import ProviderConfig
+
 
 @ProviderRegistry.register("aws")
 class AWSProvider(BaseProvider):
@@ -20,7 +27,7 @@ class AWSProvider(BaseProvider):
     AWS Bedrock Provider
     基于 boto3 的 converse API 实现。
     """
-    
+
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         # 从配置中读取 region 和 key
@@ -28,8 +35,7 @@ class AWSProvider(BaseProvider):
         bedrock_token = getattr(config, "aws_bearer_token_bedrock", None)
         os.environ["AWS_BEARER_TOKEN_BEDROCK"] = bedrock_token
         self.client = boto3.Session().client(
-            service_name="bedrock-runtime",
-            region_name=region
+            service_name="bedrock-runtime", region_name=region
         )
 
     # ==========================================
@@ -46,15 +52,15 @@ class AWSProvider(BaseProvider):
         for msg in messages:
             role = msg.role.value if hasattr(msg.role, "value") else msg.role
             if role == "system":
-                continue 
-            
+                continue
+
             # Bedrock 不支持 tool 角色，工具结果必须放在 user 角色中
             if role == "tool":
                 role = "user"
-            
+
             content = msg.content
             bedrock_content = []
-            
+
             if isinstance(content, str):
                 bedrock_content.append({"text": content})
             elif isinstance(content, list):
@@ -67,50 +73,64 @@ class AWSProvider(BaseProvider):
                             fmt = "jpeg"
                             if part.media_type:
                                 fmt = part.media_type.split("/")[-1]
-                            
+
                             source = {}
                             if part.image_url:
                                 # Bedrock converse 目前不支持直接传 URL，通常需要下载或传字节
                                 # 这里假设如果是 URL，用户暂不传，或者我们报错。
                                 # 但为了演示，我们假设存在 bytes
-                                source = {"bytes": b""} 
+                                source = {"bytes": b""}
                             elif part.data:
                                 source = {"bytes": base64.b64decode(part.data)}
-                                
-                            bedrock_content.append({"image": {"format": fmt, "source": source}})
+
+                            bedrock_content.append(
+                                {"image": {"format": fmt, "source": source}}
+                            )
                         elif part.type == "document":
-                            fmt = part.media_type.split("/")[-1] if part.media_type else "pdf"
-                            bedrock_content.append({
-                                "document": {
-                                    "format": fmt,
-                                    "name": "document",
-                                    "source": {"bytes": base64.b64decode(part.data)}
+                            fmt = (
+                                part.media_type.split("/")[-1]
+                                if part.media_type
+                                else "pdf"
+                            )
+                            bedrock_content.append(
+                                {
+                                    "document": {
+                                        "format": fmt,
+                                        "name": "document",
+                                        "source": {
+                                            "bytes": base64.b64decode(part.data)
+                                        },
+                                    }
                                 }
-                            })
+                            )
                         elif part.type == "audio":
                             # AWS Bedrock 目前不支持音频输入
                             import warnings
+
                             warnings.warn(
                                 "AWS Bedrock Converse API 目前不支持音频输入。音频内容将被忽略。",
-                                UserWarning
+                                UserWarning,
                             )
                             continue
                         elif part.type == "video":
                             # AWS Bedrock 目前不支持视频输入
                             import warnings
+
                             warnings.warn(
                                 "AWS Bedrock Converse API 目前不支持视频输入。视频内容将被忽略。",
-                                UserWarning
+                                UserWarning,
                             )
                             continue
                         elif part.type == "action":
-                            bedrock_content.append({
-                                "toolUse": {
-                                    "toolUseId": part.id,
-                                    "name": part.name,
-                                    "input": part.arguments
+                            bedrock_content.append(
+                                {
+                                    "toolUse": {
+                                        "toolUseId": part.id,
+                                        "name": part.name,
+                                        "input": part.arguments,
+                                    }
                                 }
-                            })
+                            )
                         elif part.type == "outcome":
                             # Bedrock 要求 toolResult 的 content.json 必须是对象
                             res = part.result
@@ -119,27 +139,30 @@ class AWSProvider(BaseProvider):
                                     res = json.loads(res)
                                 except:
                                     pass
-                            
+
                             if not isinstance(res, dict):
                                 res = {"result": res}
 
-                            bedrock_content.append({
-                                "toolResult": {
-                                    "toolUseId": part.id,
-                                    "content": [{"json": res}],
-                                    # "status": "error" if part.is_error else "success"
+                            bedrock_content.append(
+                                {
+                                    "toolResult": {
+                                        "toolUseId": part.id,
+                                        "content": [{"json": res}],
+                                        # "status": "error" if part.is_error else "success"
+                                    }
                                 }
-                            })
+                            )
                         else:
                             # 兜底
-                            bedrock_content.append(part.model_dump(exclude_none=True) if hasattr(part, "model_dump") else part)
+                            bedrock_content.append(
+                                part.model_dump(exclude_none=True)
+                                if hasattr(part, "model_dump")
+                                else part
+                            )
                     else:
                         bedrock_content.append(part)
-            
-            bedrock_msgs.append({
-                "role": role,
-                "content": bedrock_content
-            })
+
+            bedrock_msgs.append({"role": role, "content": bedrock_content})
         return bedrock_msgs
 
     def _normalize_response(self, response: Any, model: str) -> Response:
@@ -152,24 +175,26 @@ class AWSProvider(BaseProvider):
                 text_content += part["text"]
             elif "toolUse" in part:
                 tu = part["toolUse"]
-                actions.append(Action(
-                    id=tu.get("toolUseId"),
-                    name=tu.get("name"),
-                    arguments=tu.get("input")
-                ))
+                actions.append(
+                    Action(
+                        id=tu.get("toolUseId"),
+                        name=tu.get("name"),
+                        arguments=tu.get("input"),
+                    )
+                )
 
         content_obj = Content(text=text_content if text_content else None)
         output = Output(
             content=content_obj,
             actions=actions if actions else None,
-            status=response.get("stopReason")
+            status=response.get("stopReason"),
         )
 
         usage_data = response.get("usage", {})
         usage = Usage(
             input_tokens=usage_data.get("inputTokens", 0),
             output_tokens=usage_data.get("outputTokens", 0),
-            total_tokens=usage_data.get("totalTokens", 0)
+            total_tokens=usage_data.get("totalTokens", 0),
         )
 
         return Response(output=output, model=model, usage=usage)
@@ -190,14 +215,11 @@ class AWSProvider(BaseProvider):
             usage = Usage(
                 input_tokens=u.get("inputTokens", 0),
                 output_tokens=u.get("outputTokens", 0),
-                total_tokens=u.get("totalTokens", 0)
+                total_tokens=u.get("totalTokens", 0),
             )
 
         delta_obj = Delta(text=delta_text)
-        stream_output = StreamOutput(
-            delta=delta_obj,
-            end=finish_reason
-        )
+        stream_output = StreamOutput(delta=delta_obj, end=finish_reason)
 
         return StreamResponse(output=stream_output, model=model, usage=usage)
 
@@ -206,24 +228,28 @@ class AWSProvider(BaseProvider):
         aws_tools = []
         for t in tools:
             if hasattr(t, "function"):
-                aws_tools.append({
-                    'toolSpec': {
-                        'name': t.function.name,
-                        'description': t.function.description,
-                        'inputSchema': {'json': t.function.parameters}
+                aws_tools.append(
+                    {
+                        "toolSpec": {
+                            "name": t.function.name,
+                            "description": t.function.description,
+                            "inputSchema": {"json": t.function.parameters},
+                        }
                     }
-                })
+                )
             elif isinstance(t, dict) and "function" in t:
-                aws_tools.append({
-                    'toolSpec': {
-                        'name': t["function"]["name"],
-                        'description': t["function"]["description"],
-                        'inputSchema': {'json': t["function"]["parameters"]}
+                aws_tools.append(
+                    {
+                        "toolSpec": {
+                            "name": t["function"]["name"],
+                            "description": t["function"]["description"],
+                            "inputSchema": {"json": t["function"]["parameters"]},
+                        }
                     }
-                })
+                )
             else:
                 aws_tools.append(t)
-        return {'tools': aws_tools}
+        return {"tools": aws_tools}
 
     def list_models(self) -> List[ModelInfo]:
         """返回 AWS Bedrock 当前可用的文本输出模型列表（仅 ACTIVE 状态）"""
@@ -234,11 +260,13 @@ class AWSProvider(BaseProvider):
         for m in resp.get("modelSummaries", []):
             status = m.get("modelLifecycle", {}).get("status", "")
             if status == "ACTIVE":
-                models.append(ModelInfo(
-                    id=m["modelId"],
-                    provider=self.provider_name,
-                    display_name=m.get("modelName"),
-                ))
+                models.append(
+                    ModelInfo(
+                        id=m["modelId"],
+                        provider=self.provider_name,
+                        display_name=m.get("modelName"),
+                    )
+                )
         return models
 
     # ==========================================
@@ -247,10 +275,10 @@ class AWSProvider(BaseProvider):
 
     def chat(self, messages: List[Message], model: str, **kwargs) -> Response:
         params = self._convert_params(model, **kwargs)
-        
+
         tool_config = None
         if "tools" in params:
-             tool_config = self._convert_tools(params.pop("tools"))
+            tool_config = self._convert_tools(params.pop("tools"))
 
         # 提取系统提示词
         system_prompts = []
@@ -262,7 +290,7 @@ class AWSProvider(BaseProvider):
         converse_kwargs = {
             "modelId": model,
             "messages": self._convert_messages(messages),
-            "inferenceConfig": params
+            "inferenceConfig": params,
         }
         if system_prompts:
             converse_kwargs["system"] = system_prompts
@@ -272,12 +300,14 @@ class AWSProvider(BaseProvider):
         response = self.client.converse(**converse_kwargs)
         return self._normalize_response(response, model)
 
-    def stream_chat(self, messages: List[Message], model: str, **kwargs) -> Generator[StreamResponse, None, None]:
+    def stream_chat(
+        self, messages: List[Message], model: str, **kwargs
+    ) -> Generator[StreamResponse, None, None]:
         params = self._convert_params(model, **kwargs)
 
         tool_config = None
         if "tools" in params:
-             tool_config = self._convert_tools(params.pop("tools"))
+            tool_config = self._convert_tools(params.pop("tools"))
 
         # 提取系统提示词
         system_prompts = []
@@ -289,7 +319,7 @@ class AWSProvider(BaseProvider):
         converse_stream_kwargs = {
             "modelId": model,
             "messages": self._convert_messages(messages),
-            "inferenceConfig": params
+            "inferenceConfig": params,
         }
         if system_prompts:
             converse_stream_kwargs["system"] = system_prompts
@@ -297,25 +327,19 @@ class AWSProvider(BaseProvider):
             converse_stream_kwargs["toolConfig"] = tool_config
 
         response = self.client.converse_stream(**converse_stream_kwargs)
-        
+
         for event in response.get("stream"):
             yield self._normalize_stream_chunk(event, model)
 
     async def async_chat(
-        self, 
-        messages: List[Message], 
-        model: str,
-        **kwargs
+        self, messages: List[Message], model: str, **kwargs
     ) -> Response:
         """异步聊天接口"""
         raise ValueError("boto3 converse api not support async,at now.")
         pass
 
     async def async_stream_chat(
-        self, 
-        messages: List[Message], 
-        model: str,
-        **kwargs
+        self, messages: List[Message], model: str, **kwargs
     ) -> AsyncGenerator[StreamResponse, None]:
         """异步流式聊天接口"""
         raise ValueError("boto3 converse api not support async,at now.")

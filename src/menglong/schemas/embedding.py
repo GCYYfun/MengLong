@@ -1,4 +1,3 @@
-
 """
 嵌入模版(Embedding Template)下的相关的基础数据结构
 Embedding Template 是指用于文本嵌入向量计算的数据结构定义。
@@ -18,7 +17,9 @@ class EmbedRequest(BaseModel):
 
     texts: List[str]
     model: str
-    input_type: Optional[str] = "search_document"  # 输入类型，如 search_document, search_query 等
+    input_type: Optional[str] = (
+        "search_document"  # 输入类型，如 search_document, search_query 等
+    )
 
 
 # =========================

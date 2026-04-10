@@ -1,11 +1,11 @@
 from typing import List, Generator, Tuple, Optional, Dict, Any, Union, AsyncGenerator
 
 from menglong.schemas.chat import (
-    Message, 
-    Response, 
+    Message,
+    Response,
     StreamResponse,
     MessageRole,
-    Context
+    Context,
 )
 from menglong.schemas.model_info import ModelInfo
 from menglong.schemas.embedding import EmbedResponse
@@ -30,28 +30,36 @@ class Model:
     def _parse_model_id(self, model_id: str) -> tuple[str, str]:
         """Parse 'provider/model' string"""
         if not model_id or "/" not in model_id:
-             raise ValueError(f"Invalid model_id format: '{model_id}'. Expected 'provider/model'.")
-        
+            raise ValueError(
+                f"Invalid model_id format: '{model_id}'. Expected 'provider/model'."
+            )
+
         parts = model_id.split("/", 1)
         return parts[0], parts[1]
 
-    def _get_provider_and_model_name(self, model_override: str = None) -> tuple[BaseProvider, str]:
+    def _get_provider_and_model_name(
+        self, model_override: str = None
+    ) -> tuple[BaseProvider, str]:
         """
         根据传入的覆盖模型 ID 或默认 ID，获取对应的 Provider 实例和模型名称。
         """
         target_id = model_override or self.default_model_id
         if not target_id:
             raise ValueError("No model specified and no default_model_id set.")
-        
+
         provider_name, model_name = self._parse_model_id(target_id)
-        
+
         # 从缓存池获取或创建新 Provider
         if provider_name not in self._providers:
-            self._providers[provider_name] = ProviderRegistry.get_instance(provider_name, self.config)
-            
+            self._providers[provider_name] = ProviderRegistry.get_instance(
+                provider_name, self.config
+            )
+
         return self._providers[provider_name], model_name
 
-    def _ensure_messages(self, messages: Union[Context, List[Union[Message, Dict[str, Any], str]]]) -> List[Message]:
+    def _ensure_messages(
+        self, messages: Union[Context, List[Union[Message, Dict[str, Any], str]]]
+    ) -> List[Message]:
         """Ensure messages are Pydantic models"""
         source_msgs = messages
         if isinstance(messages, Context):
@@ -75,7 +83,7 @@ class Model:
         """归一化工具列表：支持 @tool 函数、ToolInfo 对象或原始字典"""
         if not tools:
             return None
-        
+
         normalized = []
         for t in tools:
             if callable(t) and hasattr(t, "schema"):
@@ -84,32 +92,44 @@ class Model:
                 normalized.append(t)
         return normalized
 
-    def chat(self, messages: List[Union[Message, Dict[str, Any]]], model: Optional[str] = None, **kwargs) -> Response:
+    def chat(
+        self,
+        messages: List[Union[Message, Dict[str, Any]]],
+        model: Optional[str] = None,
+        **kwargs,
+    ) -> Response:
         """
         发送聊天请求。
         """
         provider, model_name = self._get_provider_and_model_name(model)
         messages = self._ensure_messages(messages)
-        
+
         # 处理工具自动化转换
         if "tools" in kwargs:
             kwargs["tools"] = self._ensure_tools(kwargs["tools"])
-            
+
         return provider.chat(messages, model=model_name, **kwargs)
 
-    def stream_chat(self, messages: List[Union[Message, Dict[str, Any]]], model: Optional[str] = None, **kwargs) -> Generator[StreamResponse, None, None]:
+    def stream_chat(
+        self,
+        messages: List[Union[Message, Dict[str, Any]]],
+        model: Optional[str] = None,
+        **kwargs,
+    ) -> Generator[StreamResponse, None, None]:
         """
         流式发送聊天请求。
         """
         provider, model_name = self._get_provider_and_model_name(model)
         messages = self._ensure_messages(messages)
-        
+
         if "tools" in kwargs:
             kwargs["tools"] = self._ensure_tools(kwargs["tools"])
-            
+
         return provider.stream_chat(messages, model=model_name, **kwargs)
 
-    def embed(self, texts: List[str], model: Optional[str] = None, **kwargs) -> EmbedResponse:
+    def embed(
+        self, texts: List[str], model: Optional[str] = None, **kwargs
+    ) -> EmbedResponse:
         """
         发送向量嵌入请求。
         - texts: 文本列表
@@ -121,14 +141,14 @@ class Model:
     def list_models(self, provider: Optional[str] = None) -> List[ModelInfo]:
         """
         返回指定 provider 的可用模型列表。
-        
+
         Args:
             provider: provider 名称，如 'openai'/'deepseek'/'aws'/'anthropic'/'google'。
                       不传则使用 default_model_id 中的 provider。
-        
+
         Returns:
             ModelInfo 列表，每个元素的 id 字段可直接用于构造完整 model_id（provider/id）。
-        
+
         Usage::
 
             model = Model()
@@ -144,53 +164,77 @@ class Model:
             provider_name, _ = self._parse_model_id(self.default_model_id)
 
         if provider_name not in self._providers:
-            self._providers[provider_name] = ProviderRegistry.get_instance(provider_name, self.config)
+            self._providers[provider_name] = ProviderRegistry.get_instance(
+                provider_name, self.config
+            )
 
         return self._providers[provider_name].list_models()
 
     def list_all_models(self) -> Dict[str, List[ModelInfo]]:
         """
         遍历所有已配置的 provider，分别返回各自的可用模型列表。
-        
+
         Returns:
             {“provider_name”: [ModelInfo, ...]}。失败的 provider 会输出警告并返回空列表。
         """
         result: Dict[str, List[ModelInfo]] = {}
-        configured_providers = list(self.config.providers.__dict__.keys()) if hasattr(self.config, 'providers') else []
+        # 兼容处理：如果 providers 是 dict 则直接用，如果是对象则取 __dict__
+        providers_source = (
+            self.config.providers if hasattr(self.config, "providers") else None
+        )
+        if isinstance(providers_source, dict):
+            configured_providers = list(providers_source.keys())
+        else:
+            configured_providers = []
 
         for pname in configured_providers:
             try:
                 if pname not in self._providers:
-                    self._providers[pname] = ProviderRegistry.get_instance(pname, self.config)
+                    self._providers[pname] = ProviderRegistry.get_instance(
+                        pname, self.config
+                    )
                 result[pname] = self._providers[pname].list_models()
             except Exception as e:
                 import warnings
+
                 warnings.warn(f"list_all_models: provider '{pname}' 失败 — {e}")
                 result[pname] = []
         return result
 
-    async def async_chat(self, messages: List[Union[Message, Dict[str, Any]]], model: Optional[str] = None, **kwargs) -> Response:
+    async def async_chat(
+        self,
+        messages: List[Union[Message, Dict[str, Any]]],
+        model: Optional[str] = None,
+        **kwargs,
+    ) -> Response:
         """
         异步发送聊天请求。
         """
         provider, model_name = self._get_provider_and_model_name(model)
         messages = self._ensure_messages(messages)
-        
+
         # 处理工具自动化转换
         if "tools" in kwargs:
             kwargs["tools"] = self._ensure_tools(kwargs["tools"])
-            
+
         return await provider.async_chat(messages, model=model_name, **kwargs)
 
-    async def async_stream_chat(self, messages: List[Union[Message, Dict[str, Any]]], model: Optional[str] = None, **kwargs) -> AsyncGenerator[StreamResponse, None]:
+    async def async_stream_chat(
+        self,
+        messages: List[Union[Message, Dict[str, Any]]],
+        model: Optional[str] = None,
+        **kwargs,
+    ) -> AsyncGenerator[StreamResponse, None]:
         """
         异步流式发送聊天请求。
         """
         provider, model_name = self._get_provider_and_model_name(model)
         messages = self._ensure_messages(messages)
-        
+
         if "tools" in kwargs:
             kwargs["tools"] = self._ensure_tools(kwargs["tools"])
-            
-        async for chunk in provider.async_stream_chat(messages, model=model_name, **kwargs):
+
+        async for chunk in provider.async_stream_chat(
+            messages, model=model_name, **kwargs
+        ):
             yield chunk

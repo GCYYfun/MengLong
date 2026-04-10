@@ -30,3 +30,8 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/menglong"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.10",
+]

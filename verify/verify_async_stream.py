@@ -8,7 +8,7 @@ import sys
 import os
 
 # 添加项目路径
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from menglong.models.model import Model
 
@@ -23,7 +23,7 @@ async def simple_async_stream_test():
         "aws/global.anthropic.claude-sonnet-4-5-20250929-v1:0",
         "anthropic/global.anthropic.claude-sonnet-4-5-20250929-v1:0",
         "google/gemini-3-pro-preview",
-        "infinigence/claude-sonnet-4-20250514"
+        "infinigence/claude-sonnet-4-20250514",
     ]
     model = Model()
     for model_id in test_models:
@@ -34,13 +34,13 @@ async def simple_async_stream_test():
         print("-" * 40)
         print("问题: 用一句话介绍 Python\n")
         print("回答: ", end="", flush=True)
-    
-        async for chunk in model.async_stream_chat([
-            {"role": "user", "content": "用一句话介绍 Python 编程语言"}
-        ]):
+
+        async for chunk in model.async_stream_chat(
+            [{"role": "user", "content": "用一句话介绍 Python 编程语言"}]
+        ):
             if chunk.output and chunk.output.delta and chunk.output.delta.text:
                 print(chunk.output.delta.text, end="", flush=True)
-    
+
         print("\n" + "-" * 40)
         print("测试完成！")
 

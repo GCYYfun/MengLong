@@ -22,6 +22,7 @@ from menglong import Model, Context, Assistant, Tool, tool
 #  工具定义（tool call 演示用）
 # =============================================================================
 
+
 @tool
 def get_weather(city: str) -> dict:
     """
@@ -30,7 +31,13 @@ def get_weather(city: str) -> dict:
     Args:
         city: The name of the city.
     """
-    return {"city": city, "temperature": 22, "unit": "Celsius", "condition": "Sunny", "humidity": 60}
+    return {
+        "city": city,
+        "temperature": 22,
+        "unit": "Celsius",
+        "condition": "Sunny",
+        "humidity": 60,
+    }
 
 
 @tool
@@ -51,6 +58,7 @@ def calculate(expression: str) -> str:
 # =============================================================================
 #  演示函数
 # =============================================================================
+
 
 def demo_chat(model: Model):
     """普通聊天 —— 单轮问答"""
@@ -115,10 +123,12 @@ def demo_tool(model: Model):
             continue
 
         # 把 assistant 工具请求写回 Context
-        ctx.add(Assistant(
-            content=response.text,
-            tool_calls=[tc.model_dump() for tc in response.tool_calls],
-        ))
+        ctx.add(
+            Assistant(
+                content=response.text,
+                tool_calls=[tc.model_dump() for tc in response.tool_calls],
+            )
+        )
 
         # 执行工具并写回结果
         tool_map = {get_weather.__name__: get_weather, calculate.__name__: calculate}
@@ -175,10 +185,10 @@ def demo_thinking(model: Model):
 # =============================================================================
 
 DEMOS = {
-    "chat":     demo_chat,
-    "stream":   demo_stream,
+    "chat": demo_chat,
+    "stream": demo_stream,
     "thinking": demo_thinking,
-    "tool":     demo_tool,
+    "tool": demo_tool,
 }
 
 
@@ -189,12 +199,14 @@ def main():
         epilog=__doc__,
     )
     parser.add_argument(
-        "--model", "-m",
+        "--model",
+        "-m",
         default=None,
         help="模型 ID，格式 'provider/model-name'，默认使用配置文件中的 default model",
     )
     parser.add_argument(
-        "--demo", "-d",
+        "--demo",
+        "-d",
         choices=list(DEMOS.keys()) + ["all"],
         default="all",
         help="要运行的演示场景（默认 all）",

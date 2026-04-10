@@ -5,15 +5,17 @@ from menglong.models.providers.base import BaseProvider
 
 class ProviderRegistry:
     """Provider 注册表"""
-    
+
     _registry: Dict[str, Type[BaseProvider]] = {}
 
     @classmethod
     def register(cls, name: str):
         """Decorator to register a provider"""
+
         def wrapper(provider_cls: Type[BaseProvider]):
             cls._registry[name] = provider_cls
             return provider_cls
+
         return wrapper
 
     @classmethod
@@ -27,16 +29,16 @@ class ProviderRegistry:
             except (ImportError, ModuleNotFoundError):
                 # 即使加载失败也不报错，可能该 provider 不是通过文件定义的，或者确实不存在
                 pass
-                
+
         return cls._registry.get(provider_name)
-    
+
     @classmethod
     def get_instance(cls, provider_name: str, config_source: Any) -> BaseProvider:
         """
         工厂方法：根据名称获取 Provider 实例，支持按需加载。
         """
         from menglong.utils.config.config_type import ProviderConfig
-        
+
         provider_cls = cls.get_provider_class(provider_name)
         if not provider_cls:
             raise ValueError(
@@ -44,10 +46,12 @@ class ProviderRegistry:
                 f"Ensure 'src/menglong/models/providers/{provider_name}.py' exists "
                 f"and contains a class decorated with @ProviderRegistry.register('{provider_name}')"
             )
-        
-        provider_config = getattr(config_source, "providers", {}).get(provider_name, ProviderConfig())
+
+        provider_config = getattr(config_source, "providers", {}).get(
+            provider_name, ProviderConfig()
+        )
         return provider_cls(provider_config)
-    
+
     @classmethod
     def list_providers(cls) -> List[str]:
         return list(cls._registry.keys())

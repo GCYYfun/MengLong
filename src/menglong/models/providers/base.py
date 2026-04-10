@@ -1,13 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Generator, Union, Dict, Any, Optional, AsyncGenerator
 
-from menglong.schemas.chat import (
-    Message, 
-    Response,
-    StreamResponse,
-    StreamOutput,
-    Delta
-)
+from menglong.schemas.chat import Message, Response, StreamResponse, StreamOutput, Delta
 from menglong.schemas.model_info import ModelInfo
 from menglong.schemas.embedding import EmbedResponse
 from menglong.utils.config.config_type import ProviderConfig
@@ -59,12 +53,12 @@ class BaseProvider(ABC):
         if model in self.config.models:
             model_config = self.config.models[model]
             params.update(model_config.model_dump(exclude_none=True))
-        
+
         # 2. 动态运行时参数合并
         for k, v in kwargs.items():
             if v is not None:
                 params[k] = v
-        
+
         return params
 
     # ==========================================
@@ -72,41 +66,27 @@ class BaseProvider(ABC):
     # ==========================================
 
     @abstractmethod
-    def chat(
-        self, 
-        messages: List[Message], 
-        model: str,
-        **kwargs
-    ) -> Response:
+    def chat(self, messages: List[Message], model: str, **kwargs) -> Response:
         """同步聊天接口"""
         pass
 
     @abstractmethod
     def stream_chat(
-        self, 
-        messages: List[Message], 
-        model: str,
-        **kwargs
+        self, messages: List[Message], model: str, **kwargs
     ) -> Generator[StreamResponse, None, None]:
         """流式聊天接口"""
         pass
 
     @abstractmethod
     async def async_chat(
-        self, 
-        messages: List[Message], 
-        model: str,
-        **kwargs
+        self, messages: List[Message], model: str, **kwargs
     ) -> Response:
         """异步聊天接口"""
         pass
 
     @abstractmethod
     async def async_stream_chat(
-        self, 
-        messages: List[Message], 
-        model: str,
-        **kwargs
+        self, messages: List[Message], model: str, **kwargs
     ) -> AsyncGenerator[StreamResponse, None]:
         """异步流式聊天接口"""
         pass
@@ -116,7 +96,9 @@ class BaseProvider(ABC):
         [可选] 向量嵌入接口。
         并非所有 Provider 都支持，默认抛出异常。
         """
-        raise NotImplementedError(f"Provider '{self.provider_name}' does not support embeddings.")
+        raise NotImplementedError(
+            f"Provider '{self.provider_name}' does not support embeddings."
+        )
 
     def list_models(self) -> List[ModelInfo]:
         """
@@ -124,9 +106,11 @@ class BaseProvider(ABC):
         默认返回空列表；各 Provider 子类按需覆盖。
         """
         import warnings
+
         warnings.warn(
             f"Provider '{self.provider_name}' has not implemented list_models().",
-            UserWarning, stacklevel=2,
+            UserWarning,
+            stacklevel=2,
         )
         return []
 
