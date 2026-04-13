@@ -115,6 +115,7 @@ class Action(ContentPart):
 
     type: str = "action"
     id: Any = None
+    index: Optional[int] = None  # 用于流式合并
     name: str = ""
     arguments: Optional[Union[Dict[str, Any], str]] = None
 
@@ -322,7 +323,7 @@ def User(content: Union[str, List[Any]], **kwargs) -> Message:
 
 
 def Assistant(
-    content: Optional[str] = None, actions: Optional[List[Dict]] = None
+    content: Optional[str] = None, actions: Optional[List[Union[Dict[str, Any], Action]]] = None
 ) -> Message:
     """快捷构造 Assistant 消息，支持工具调用负载"""
     if not actions:
@@ -333,7 +334,24 @@ def Assistant(
         parts.append(TextPart(text=content))
 
     for action in actions:
-        parts.append(Action(id=action.id, name=action.name, arguments=action.arguments))
+        if isinstance(action, dict):
+            # 处理字典类型
+            parts.append(
+                Action(
+                    id=action.get("id"),
+                    name=action.get("name"),
+                    arguments=action.get("arguments"),
+                )
+            )
+        else:
+            # 处理对象类型 (Action 或其他带属性的对象)
+            parts.append(
+                Action(
+                    id=getattr(action, "id", None),
+                    name=getattr(action, "name", ""),
+                    arguments=getattr(action, "arguments", None),
+                )
+            )
     return Message(role=MessageRole.ASSISTANT, content=parts)
 
 
@@ -410,6 +428,7 @@ class Response(BaseModel):
 class Delta(BaseModel):
     text: Optional[str] = None
     reasoning: Optional[str] = None
+    actions: Optional[List[Action]] = None
 
 
 class StreamOutput(BaseModel):

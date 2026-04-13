@@ -245,8 +245,11 @@ class OpenAIProvider(BaseProvider):
                     args = {"raw": tc.function.arguments}
                 actions.append(Action(id=tc.id, name=tc.function.name, arguments=args))
 
+        # 提取思维推理内容（DeepSeek-thinking 、Infinigence thinking 等模型特有字段）
+        reasoning = getattr(choice.message, "reasoning_content", None)
+
         output = Output(
-            content=Content(text=choice.message.content),
+            content=Content(text=choice.message.content, reasoning=reasoning),
             actions=actions,
             status=choice.finish_reason,
         )
@@ -262,8 +265,26 @@ class OpenAIProvider(BaseProvider):
             return StreamResponse(model=chunk.model)
 
         delta = chunk.choices[0].delta
+        # 提取思维推理 delta（DeepSeek-thinking 、Infinigence thinking 等模型特有字段）
+        reasoning_delta = getattr(delta, "reasoning_content", None)
+
+        # 提取工具调用 delta
+        actions = []
+        if hasattr(delta, "tool_calls") and delta.tool_calls:
+            for tc in delta.tool_calls:
+                actions.append(
+                    Action(
+                        id=tc.id,
+                        index=getattr(tc, "index", None),
+                        name=getattr(tc.function, "name", "") or "",
+                        arguments=getattr(tc.function, "arguments", "") or "",
+                    )
+                )
+
         stream_output = StreamOutput(
-            delta=Delta(text=delta.content),
+            delta=Delta(
+                text=delta.content, reasoning=reasoning_delta, actions=actions or None
+            ),
             end=chunk.choices[0].finish_reason,
         )
         return StreamResponse(

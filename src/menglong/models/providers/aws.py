@@ -28,15 +28,41 @@ class AWSProvider(BaseProvider):
     基于 boto3 的 converse API 实现。
     """
 
+    # Bedrock converse 同步调用 max_tokens 上限（超过偏大值需要 stream 模式）
+    _SYNC_MAX_TOKENS: int = 21000   # 安全上限（API 硬限 21332）
+    _STREAM_MAX_TOKENS: int = 64000 # 流式模式默认最大值
+
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
-        # 从配置中读取 region 和 key
         region = getattr(config, "region", None) or os.getenv("AWS_REGION", "us-west-2")
         bedrock_token = getattr(config, "aws_bearer_token_bedrock", None)
         os.environ["AWS_BEARER_TOKEN_BEDROCK"] = bedrock_token
         self.client = boto3.Session().client(
             service_name="bedrock-runtime", region_name=region
         )
+
+    def _convert_params(self, model: str, stream: bool = False, **kwargs) -> Dict[str, Any]:
+        """
+        转换参数，并根据 stream 模式自动调整 max_tokens。
+
+        - stream=False (chat)：max_tokens 截断至 _SYNC_MAX_TOKENS（21000）避免 API 报错。
+        - stream=True  (stream_chat)：允许完整配置值，未指定时默认 _STREAM_MAX_TOKENS。
+        """
+        params = super()._convert_params(model, **kwargs)
+        # Bedrock inferenceConfig 不接受 stream 字段
+        params.pop("stream", None)
+
+        if not stream:
+            current = params.get("max_tokens")
+            if current is None:
+                params["max_tokens"] = self._SYNC_MAX_TOKENS
+            elif current > self._SYNC_MAX_TOKENS:
+                params["max_tokens"] = self._SYNC_MAX_TOKENS
+        else:
+            if params.get("max_tokens") is None:
+                params["max_tokens"] = self._STREAM_MAX_TOKENS
+
+        return params
 
     # ==========================================
     #         生命周期钩子实现
@@ -274,13 +300,13 @@ class AWSProvider(BaseProvider):
     # ==========================================
 
     def chat(self, messages: List[Message], model: str, **kwargs) -> Response:
-        params = self._convert_params(model, **kwargs)
+        # stream=False：同步模式，max_tokens 自动截断至 21000
+        params = self._convert_params(model, stream=False, **kwargs)
 
         tool_config = None
         if "tools" in params:
             tool_config = self._convert_tools(params.pop("tools"))
 
-        # 提取系统提示词
         system_prompts = []
         for m in messages:
             role_val = m.role.value if hasattr(m.role, "value") else m.role
@@ -303,13 +329,13 @@ class AWSProvider(BaseProvider):
     def stream_chat(
         self, messages: List[Message], model: str, **kwargs
     ) -> Generator[StreamResponse, None, None]:
-        params = self._convert_params(model, **kwargs)
+        # stream=True：流式模式，允许完整 max_tokens
+        params = self._convert_params(model, stream=True, **kwargs)
 
         tool_config = None
         if "tools" in params:
             tool_config = self._convert_tools(params.pop("tools"))
 
-        # 提取系统提示词
         system_prompts = []
         for m in messages:
             role_val = m.role.value if hasattr(m.role, "value") else m.role

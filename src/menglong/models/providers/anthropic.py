@@ -107,21 +107,34 @@ class AnthropicProvider(BaseProvider):
                 )
             return self._async_native_client
 
-    def _convert_params(self, model: str, **kwargs) -> Dict[str, Any]:
-        """[由内向外]：转换参数，并注入 Anthropic 强制要求的默认值"""
-        params = super()._convert_params(model, **kwargs)
+    # Anthropic / Bedrock 同步调用的 max_tokens 上限（超过此值 API 要求必须使用流式）
+    _SYNC_MAX_TOKENS: int = 21000   # 安全上限（API 硬限 21332）
+    _STREAM_MAX_TOKENS: int = 64000 # 流式模式的默认最大值
 
-        if not params.get("stream", False):
-            # Anthropic SDK 强制要求 max_tokens
-            if (
-                "max_tokens" not in params
-                and params.get("max_tokens") is None
-                or params.get("max_tokens") > 4096
-            ):
-                params["max_tokens"] = 4096  # 过大max_tokens会导致SDK让使用stream方式
+    def _convert_params(self, model: str, stream: bool = False, **kwargs) -> Dict[str, Any]:
+        """
+        转换参数，并根据 stream 模式自动调整 max_tokens。
+
+        - stream=False (chat 模式)：max_tokens 截断至 _SYNC_MAX_TOKENS（21000），
+          避免因 max_tokens 过大而被 API 强制要求使用流式，导致报错。
+        - stream=True  (stream_chat 模式)：max_tokens 允许使用完整配置值，
+          未指定时默认为 _STREAM_MAX_TOKENS。
+        """
+        params = super()._convert_params(model, **kwargs)
+        # 移除上层可能传入的 stream 字段（Anthropic SDK 不接受该参数）
+        params.pop("stream", None)
+
+        if not stream:
+            # 同步模式：max_tokens 必须 ≤ _SYNC_MAX_TOKENS
+            current = params.get("max_tokens")
+            if current is None:
+                params["max_tokens"] = self._SYNC_MAX_TOKENS
+            elif current > self._SYNC_MAX_TOKENS:
+                params["max_tokens"] = self._SYNC_MAX_TOKENS
         else:
-            if "max_tokens" not in params and params.get("max_tokens") is None:
-                params["max_tokens"] = 64000  # 默认给大一点
+            # 流式模式：未指定则给一个较大的默认值
+            if params.get("max_tokens") is None:
+                params["max_tokens"] = self._STREAM_MAX_TOKENS
 
         # Anthropic 要求 tool_choice 必须是一个对象
         if "tool_choice" in params:
@@ -131,9 +144,7 @@ class AnthropicProvider(BaseProvider):
                     params["tool_choice"] = {"type": "any"}
                 elif tc.lower() in ("auto", "any"):
                     params["tool_choice"] = {"type": tc.lower()}
-                # 其它字符串（比如 tool name）不作通用转换，可能由外部自行保证
             elif getattr(tc, "type", None) == "function":
-                # 防御性兼容：如果是 OpenAI 对象的 {"type": "function", "function": {"name": ...}}
                 pass
 
         return params
@@ -393,14 +404,13 @@ class AnthropicProvider(BaseProvider):
     # ==========================================
 
     def chat(self, messages: List[Message], model: str, **kwargs) -> Response:
-        params = self._convert_params(model, **kwargs)
+        # stream=False：同步模式，max_tokens 自动截断至 21000
+        params = self._convert_params(model, stream=False, **kwargs)
         client = self._get_client(model)
 
-        # 处理工具转换 (MengLong Standard -> Anthropic Format)
         if "tools" in params:
             params["tools"] = self._convert_tools(params["tools"])
 
-        # 提取系统提示词
         system_prompt = ""
         for m in messages:
             role_val = m.role.value if hasattr(m.role, "value") else m.role
@@ -419,14 +429,13 @@ class AnthropicProvider(BaseProvider):
     def stream_chat(
         self, messages: List[Message], model: str, **kwargs
     ) -> Generator[StreamResponse, None, None]:
-        params = self._convert_params(model, **kwargs)
+        # stream=True：流式模式，允许完整 max_tokens
+        params = self._convert_params(model, stream=True, **kwargs)
         client = self._get_client(model)
 
-        # 处理工具转换
         if "tools" in params:
             params["tools"] = self._convert_tools(params["tools"])
 
-        # 提取系统提示词
         system_prompt = ""
         for m in messages:
             role_val = m.role.value if hasattr(m.role, "value") else m.role
@@ -450,14 +459,13 @@ class AnthropicProvider(BaseProvider):
     async def async_chat(
         self, messages: List[Message], model: str, **kwargs
     ) -> Response:
-        params = self._convert_params(model, **kwargs)
+        # stream=False：同步模式，max_tokens 自动截断至 21000
+        params = self._convert_params(model, stream=False, **kwargs)
         client = self._get_async_client(model)
 
-        # 处理工具转换 (MengLong Standard -> Anthropic Format)
         if "tools" in params:
             params["tools"] = self._convert_tools(params["tools"])
 
-        # 提取系统提示词
         system_prompt = ""
         for m in messages:
             role_val = m.role.value if hasattr(m.role, "value") else m.role
@@ -476,14 +484,13 @@ class AnthropicProvider(BaseProvider):
     async def async_stream_chat(
         self, messages: List[Message], model: str, **kwargs
     ) -> AsyncGenerator[StreamResponse, None]:
-        params = self._convert_params(model, **kwargs)
+        # stream=True：流式模式，允许完整 max_tokens
+        params = self._convert_params(model, stream=True, **kwargs)
         client = self._get_async_client(model)
 
-        # 处理工具转换
         if "tools" in params:
             params["tools"] = self._convert_tools(params["tools"])
 
-        # 提取系统提示词
         system_prompt = ""
         for m in messages:
             role_val = m.role.value if hasattr(m.role, "value") else m.role
