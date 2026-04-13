@@ -82,7 +82,7 @@ def demo_stream(model: Model):
 
     ctx = Context()
     ctx.system("你是一位简洁友好的 AI 助手，回复请控制在 2 句话以内。")
-    ctx.user("用一句话介绍一下量子计算。")
+    ctx.user("用一句话介绍一下你自己。")
 
     print("[assistant] ", end="", flush=True)
     for chunk in model.stream_chat(messages=ctx):
@@ -104,7 +104,7 @@ def demo_tool(model: Model):
 
     # ── 测试用例列表 ──────────────────────────────────────────────
     test_cases = [
-        "上海今天的天气怎么样？",
+        "你是谁？上海今天的天气怎么样？",
         "帮我算一下 (12.5 + 7.3) * 4",
     ]
 
@@ -126,7 +126,7 @@ def demo_tool(model: Model):
         ctx.add(
             Assistant(
                 content=response.text,
-                tool_calls=[tc.model_dump() for tc in response.tool_calls],
+                actions=[tc.model_dump() for tc in response.tool_calls],
             )
         )
 
@@ -156,15 +156,17 @@ def demo_thinking(model: Model):
     print("=" * 50)
 
     # 优先使用 DeepSeek Reasoner，若调用方传入了其他模型则以传入为准
-    thinking_model = Model(default_model_id="deepseek/deepseek-reasoner")
+    # thinking_model = Model(default_model_id="deepseek/deepseek-reasoner")
 
     ctx = Context()
-    ctx.system("你是善于逻辑推理的 AI 助手，请展示完整的思考过程。")
-    ctx.user("一个班有 30 个学生，其中 2/5 是女生，男生比女生多几人？")
+    ctx.system("你非常友善。")
+    ctx.user(
+        "先介绍下你自己，然后告诉我，一个班有 30 个学生，其中 2/5 是女生，男生比女生多几人？"
+    )
 
     print("[thinking] ", end="", flush=True)
     in_answer = False
-    for chunk in thinking_model.stream_chat(messages=ctx):
+    for chunk in model.stream_chat(messages=ctx):
         if chunk.output is None:
             continue
         delta = chunk.output.delta
@@ -201,7 +203,7 @@ def main():
     parser.add_argument(
         "--model",
         "-m",
-        default=None,
+        default="xiaomi/mimo-v2-flash",
         help="模型 ID，格式 'provider/model-name'，默认使用配置文件中的 default model",
     )
     parser.add_argument(
