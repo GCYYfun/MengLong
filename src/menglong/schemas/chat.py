@@ -129,6 +129,13 @@ class Outcome(ContentPart):
     result: str
 
 
+class ThinkingPart(ContentPart):
+    """思维/推理过程片段"""
+
+    type: str = "thinking"
+    thinking: str
+
+
 class Message(BaseModel):
     """聊天消息"""
 
@@ -145,6 +152,7 @@ class Message(BaseModel):
                     DocumentPart,
                     ImagePart,
                     TextPart,
+                    ThinkingPart,
                     Dict[str, Any],
                 ]
             ],
@@ -323,35 +331,41 @@ def User(content: Union[str, List[Any]], **kwargs) -> Message:
 
 
 def Assistant(
-    content: Optional[str] = None, actions: Optional[List[Union[Dict[str, Any], Action]]] = None
+    content: Optional[str] = None,
+    actions: Optional[List[Union[Dict[str, Any], Action]]] = None,
+    reasoning: Optional[str] = None,
 ) -> Message:
-    """快捷构造 Assistant 消息，支持工具调用负载"""
-    if not actions:
+    """快捷构造 Assistant 消息，支持工具调用负载与思维链"""
+    if not actions and not reasoning:
         return Message(role=MessageRole.ASSISTANT, content=content)
 
     parts = []
     if content:
         parts.append(TextPart(text=content))
 
-    for action in actions:
-        if isinstance(action, dict):
-            # 处理字典类型
-            parts.append(
-                Action(
-                    id=action.get("id"),
-                    name=action.get("name"),
-                    arguments=action.get("arguments"),
+    if reasoning:
+        parts.append(ThinkingPart(thinking=reasoning))
+
+    if actions:
+        for action in actions:
+            if isinstance(action, dict):
+                # 处理字典类型
+                parts.append(
+                    Action(
+                        id=action.get("id"),
+                        name=action.get("name"),
+                        arguments=action.get("arguments"),
+                    )
                 )
-            )
-        else:
-            # 处理对象类型 (Action 或其他带属性的对象)
-            parts.append(
-                Action(
-                    id=getattr(action, "id", None),
-                    name=getattr(action, "name", ""),
-                    arguments=getattr(action, "arguments", None),
+            else:
+                # 处理对象类型 (Action 或其他带属性的对象)
+                parts.append(
+                    Action(
+                        id=getattr(action, "id", None),
+                        name=getattr(action, "name", ""),
+                        arguments=getattr(action, "arguments", None),
+                    )
                 )
-            )
     return Message(role=MessageRole.ASSISTANT, content=parts)
 
 

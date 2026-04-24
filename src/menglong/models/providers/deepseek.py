@@ -6,6 +6,7 @@ from menglong.models.providers.openai import OpenAIProvider
 from menglong.models.providers.registry import ProviderRegistry
 from menglong.schemas.chat import (
     Message,
+    MessageRole,
     Response,
     StreamResponse,
     Output,
@@ -36,6 +37,34 @@ class DeepSeekProvider(OpenAIProvider):
             config.api_key = os.getenv("DEEPSEEK_API_KEY")
 
         super().__init__(config)
+
+    def _convert_messages(self, messages: List[Message]) -> List[Dict[str, Any]]:
+        """实现推理内容的发送支持"""
+        openai_msgs = super()._convert_messages(messages)
+
+        # 从 Message.content 中提取 thinking 块并映射回 reasoning_content
+        for i, msg in enumerate(messages):
+            if i < len(openai_msgs) and (
+                msg.role == "assistant" or msg.role == MessageRole.ASSISTANT
+            ):
+                reasoning = None
+
+                # 尝试从 content list 中寻找思维链内容
+                if isinstance(msg.content, list):
+                    for part in msg.content:
+                        p_type = getattr(part, "type", None) or (
+                            part.get("type") if isinstance(part, dict) else None
+                        )
+                        if p_type == "thinking":
+                            reasoning = getattr(part, "thinking", None) or (
+                                part.get("thinking") if isinstance(part, dict) else None
+                            )
+                            break
+
+                if reasoning:
+                    openai_msgs[i]["reasoning_content"] = reasoning
+
+        return openai_msgs
 
     def _normalize_response(self, response: Any, model: str) -> Response:
         """支持 reasoning_content 的归一化"""

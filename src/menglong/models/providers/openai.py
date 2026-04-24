@@ -86,8 +86,8 @@ class OpenAIProvider(BaseProvider):
                     stacklevel=3,
                 )
 
-            elif part_type in ("action", "outcome"):
-                # 工具相关 part 不放入 content 列表
+            elif part_type in ("action", "outcome", "thinking"):
+                # 工具相关 part 和思维链不放入 content 列表
                 pass
 
             elif hasattr(part, "model_dump"):
@@ -304,18 +304,22 @@ class OpenAIProvider(BaseProvider):
             params["tools"] = self._convert_tools(params["tools"])
 
         if "tool_choice" in params:
-            tc = params["tool_choice"]
-            if isinstance(tc, dict) and "type" in tc:
-                tc_type = tc["type"]
-                if tc_type in ("auto", "none", "required"):
-                    params["tool_choice"] = tc_type
-                elif tc_type == "any":
-                    params["tool_choice"] = "required"
-                elif tc_type == "tool" and "name" in tc:
-                    params["tool_choice"] = {
-                        "type": "function",
-                        "function": {"name": tc["name"]},
-                    }
+            # 防御性：如果没有 tools，则不应该发送 tool_choice，否则 OpenAI API 会报错 400
+            if "tools" not in params:
+                del params["tool_choice"]
+            else:
+                tc = params["tool_choice"]
+                if isinstance(tc, dict) and "type" in tc:
+                    tc_type = tc["type"]
+                    if tc_type in ("auto", "none", "required"):
+                        params["tool_choice"] = tc_type
+                    elif tc_type == "any":
+                        params["tool_choice"] = "required"
+                    elif tc_type == "tool" and "name" in tc:
+                        params["tool_choice"] = {
+                            "type": "function",
+                            "function": {"name": tc["name"]},
+                        }
 
         return params
 
