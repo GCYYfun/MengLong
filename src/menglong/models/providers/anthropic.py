@@ -108,10 +108,12 @@ class AnthropicProvider(BaseProvider):
             return self._async_native_client
 
     # Anthropic / Bedrock 同步调用的 max_tokens 上限（超过此值 API 要求必须使用流式）
-    _SYNC_MAX_TOKENS: int = 21000   # 安全上限（API 硬限 21332）
-    _STREAM_MAX_TOKENS: int = 64000 # 流式模式的默认最大值
+    _SYNC_MAX_TOKENS: int = 21000  # 安全上限（API 硬限 21332）
+    _STREAM_MAX_TOKENS: int = 64000  # 流式模式的默认最大值
 
-    def _convert_params(self, model: str, stream: bool = False, **kwargs) -> Dict[str, Any]:
+    def _convert_params(
+        self, model: str, stream: bool = False, **kwargs
+    ) -> Dict[str, Any]:
         """
         转换参数，并根据 stream 模式自动调整 max_tokens。
 
@@ -250,6 +252,17 @@ class AnthropicProvider(BaseProvider):
                                 # "is_error": part.is_error
                             }
                         )
+                    elif part.type == "thinking":
+                        # Anthropic Extended Thinking — must be round-tripped back as-is
+                        # signature is required by Anthropic API when replaying thinking blocks
+                        block: Dict[str, Any] = {
+                            "type": "thinking",
+                            "thinking": part.thinking,
+                        }
+                        sig = getattr(part, "signature", None)
+                        if sig:
+                            block["signature"] = sig
+                        serialized_content.append(block)
                     elif hasattr(part, "model_dump"):
                         serialized_content.append(part.model_dump(exclude_none=True))
                     else:
@@ -262,10 +275,14 @@ class AnthropicProvider(BaseProvider):
     def _normalize_response(self, response: Any, model: str) -> Response:
         """归一化响应（Native 与 Bedrock SDK 返回的消息对象结构一致）"""
         text_content = ""
+        reasoning_content = ""
         actions = []
         for block in response.content:
             if hasattr(block, "text"):
                 text_content += block.text
+            elif hasattr(block, "type") and block.type == "thinking":
+                # Extended thinking block — capture reasoning text
+                reasoning_content += getattr(block, "thinking", "")
             elif hasattr(block, "type") and block.type == "tool_use":
                 actions.append(
                     Action(id=block.id, name=block.name, arguments=block.input)
@@ -273,6 +290,8 @@ class AnthropicProvider(BaseProvider):
             elif isinstance(block, dict):
                 if block.get("type") == "text":
                     text_content += block.get("text", "")
+                elif block.get("type") == "thinking":
+                    reasoning_content += block.get("thinking", "")
                 elif block.get("type") == "tool_use":
                     actions.append(
                         Action(
@@ -282,7 +301,10 @@ class AnthropicProvider(BaseProvider):
                         )
                     )
 
-        content_obj = Content(text=text_content if text_content else None)
+        content_obj = Content(
+            text=text_content if text_content else None,
+            reasoning=reasoning_content if reasoning_content else None,
+        )
         output = Output(
             content=content_obj,
             actions=actions if actions else None,

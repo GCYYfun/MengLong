@@ -94,7 +94,7 @@ class Model:
 
     def chat(
         self,
-        messages: List[Union[Message, Dict[str, Any]]],
+        messages: Union[Context, List[Union[Message, Dict[str, Any], str]]],
         model: Optional[str] = None,
         **kwargs,
     ) -> Response:
@@ -112,7 +112,7 @@ class Model:
 
     def stream_chat(
         self,
-        messages: List[Union[Message, Dict[str, Any]]],
+        messages: Union[Context, List[Union[Message, Dict[str, Any], str]]],
         model: Optional[str] = None,
         **kwargs,
     ) -> Generator[StreamResponse, None, None]:
@@ -203,7 +203,7 @@ class Model:
 
     async def async_chat(
         self,
-        messages: List[Union[Message, Dict[str, Any]]],
+        messages: Union[Context, List[Union[Message, Dict[str, Any], str]]],
         model: Optional[str] = None,
         **kwargs,
     ) -> Response:
@@ -221,7 +221,7 @@ class Model:
 
     async def async_stream_chat(
         self,
-        messages: List[Union[Message, Dict[str, Any]]],
+        messages: Union[Context, List[Union[Message, Dict[str, Any], str]]],
         model: Optional[str] = None,
         **kwargs,
     ) -> AsyncGenerator[StreamResponse, None]:
